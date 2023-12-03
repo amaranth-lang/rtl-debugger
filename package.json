@@ -1,0 +1,183 @@
+{
+  "name": "cxxrtldebugger",
+  "displayName": "CXXRTL Debugger",
+  "description": "Debugger for HDLs supported by the open-source toolchain: Amaranth, Verilog, VHDL, ...",
+  "version": "0.0.0",
+  "engines": {
+    "vscode": "^1.84.0"
+  },
+  "categories": [
+    "Debuggers"
+  ],
+  "activationEvents": [],
+  "main": "./out/extension.js",
+  "contributes": {
+    "configuration": {
+      "id": "CXXRTLDebugger",
+      "type": "object",
+      "title": "CXXRTL Debugger",
+      "$comment": "UPSTREAM: Unfortunately there is no way to control the formatting of the extension name within the setting title. See microsoft/vscode#103592",
+      "properties": {
+        "cxxrtlDebugger.command": {
+          "type": ["array"],
+          "items": {
+            "type": "string"
+          },
+          "minItems": 1,
+          "description": "Specifies the command to run when launching a debug session."
+        },
+        "cxxrtlDebugger.cwd": {
+          "type": "string",
+          "default": "${workspaceFolder}",
+          "description": "Specifies the working directory for the launch command."
+        },
+        "cxxrtlDebugger.port": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 65535,
+          "default": 6618,
+          "description": "Specifies the port that the CXXRTL agent within the debug session is listening at."
+        }
+      }
+    },
+    "commands": [
+      {
+        "command": "cxxrtlDebugger.startSession",
+        "category": "CXXRTL Debugger",
+        "title": "Start Session"
+      },
+      {
+        "command": "cxxrtlDebugger.stopSession",
+        "category": "CXXRTL Debugger",
+        "title": "Stop Session"
+      },
+      {
+        "command": "cxxrtlDebugger.runSimulation",
+        "category": "CXXRTL Debugger",
+        "title": "Run Simulation"
+      },
+      {
+        "command": "cxxrtlDebugger.runSimulationUntil",
+        "category": "CXXRTL Debugger",
+        "title": "Run Simulation Until..."
+      },
+      {
+        "command": "cxxrtlDebugger.pauseSimulation",
+        "category": "CXXRTL Debugger",
+        "title": "Pause Simulation"
+      },
+      {
+        "command": "cxxrtlDebugger.resetSimulation",
+        "category": "CXXRTL Debugger",
+        "title": "Reset Simulation"
+      },
+      {
+        "command": "cxxrtlDebugger.stepForward",
+        "category": "CXXRTL Debugger",
+        "title": "Step Forward"
+      },
+      {
+        "command": "cxxrtlDebugger.stepBackward",
+        "category": "CXXRTL Debugger",
+        "title": "Step Backward"
+      }
+    ],
+    "viewsContainers": {
+      "activitybar": [
+        {
+          "id": "cxxrtlDebugger",
+          "title": "CXXRTL Debugger",
+          "icon": "media/chip-debug.svg"
+        }
+      ]
+    },
+    "views": {
+      "cxxrtlDebugger": [
+        {
+          "id": "cxxrtlDebugger.hierarchy",
+          "name": "Hierarchy"
+        },
+        {
+          "id": "cxxrtlDebugger.variables",
+          "name": "Variables"
+        }
+      ]
+    },
+    "viewsWelcome": [
+      {
+        "view": "cxxrtlDebugger.hierarchy",
+        "contents": "The debug session is not running.\n[Start Session](command:cxxrtlDebugger.startSession)",
+        "when": "cxxrtlDebugger.sessionState == absent"
+      },
+      {
+        "view": "cxxrtlDebugger.hierarchy",
+        "contents": "The debug session is initializing...",
+        "when": "cxxrtlDebugger.sessionState == starting"
+      },
+      {
+        "view": "cxxrtlDebugger.hierarchy",
+        "contents": "There are no scopes in the simulation.",
+        "when": "cxxrtlDebugger.sessionState == running"
+      },
+      {
+        "view": "cxxrtlDebugger.variables",
+        "contents": "The selected scope is empty."
+      }
+    ],
+    "menus": {
+      "commandPalette": [
+        {
+          "command": "cxxrtlDebugger.startSession",
+          "when": "cxxrtlDebugger.sessionState == absent"
+        },
+        {
+          "command": "cxxrtlDebugger.stopSession",
+          "when": "cxxrtlDebugger.sessionState == running"
+        },
+        {
+          "command": "cxxrtlDebugger.runSimulation",
+          "when": "cxxrtlDebugger.sessionState == running && cxxrtlDebugger.simulationState == stopped"
+        },
+        {
+          "command": "cxxrtlDebugger.runSimulationUntil",
+          "when": "cxxrtlDebugger.sessionState == running && cxxrtlDebugger.simulationState == stopped"
+        },
+        {
+          "command": "cxxrtlDebugger.pauseSimulation",
+          "when": "cxxrtlDebugger.sessionState == running && cxxrtlDebugger.simulationState == running"
+        },
+        {
+          "command": "cxxrtlDebugger.resetSimulation",
+          "when": "cxxrtlDebugger.sessionState == running"
+        },
+        {
+          "command": "cxxrtlDebugger.stepForward",
+          "when": "cxxrtlDebugger.sessionState == running"
+        },
+        {
+          "command": "cxxrtlDebugger.stepBackward",
+          "when": "cxxrtlDebugger.sessionState == running"
+        }
+      ]
+    }
+  },
+  "scripts": {
+    "vscode:prepublish": "npm run compile",
+    "compile": "tsc -p ./",
+    "watch": "tsc -watch -p ./",
+    "pretest": "npm run compile && npm run lint",
+    "lint": "eslint src --ext ts",
+    "test": "vscode-test"
+  },
+  "devDependencies": {
+    "@types/vscode": "^1.84.0",
+    "@types/mocha": "^10.0.6",
+    "@types/node": "18.x",
+    "@typescript-eslint/eslint-plugin": "^6.13.1",
+    "@typescript-eslint/parser": "^6.13.1",
+    "eslint": "^8.54.0",
+    "typescript": "^5.3.2",
+    "@vscode/test-cli": "^0.0.4",
+    "@vscode/test-electron": "^2.3.8"
+  }
+}
