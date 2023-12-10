@@ -9,6 +9,9 @@
 		"sourceMap": true,
 		"rootDir": "src",
 		"strict": true,
-		"noImplicitReturns": true
+		"noImplicitReturns": true,
+		"noImplicitAny": true,
+		"noImplicitOverride": true,
+		"noImplicitThis": true
 	}
 }

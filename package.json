@@ -37,6 +37,11 @@
           "maximum": 65535,
           "default": 6618,
           "description": "Specifies the port that the CXXRTL agent within the debug session is listening at."
+        },
+        "cxxrtlDebugger.rangeStyle": {
+          "enum": ["Verilog/VHDL", "Python"],
+          "default": "Verilog/VHDL",
+          "markdownDescription": "Specifies the display format for bit ranges. A 32-bit variable would be displayed as, with LSB at bit 0 and at bit 8 respectively:\n\n- in \"Verilog/VHDL\" style: `[31:0]`, `[39:8]`\n- in \"Python\" style: `[32]`, `[8:40]`"
         }
       }
     },

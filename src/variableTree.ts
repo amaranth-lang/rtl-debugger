@@ -3,6 +3,62 @@ import { CXXRTLDebugger } from './debugger';
 import { ICXXRTLDebugItem, ICXXRTLSourceLocation } from './connection';
 
 export class CXXRTLVariableTreeItem extends vscode.TreeItem {
+    public override id: string;
+
+    constructor(id: string, debugItem: ICXXRTLDebugItem) {
+        const label = id.substring(id.lastIndexOf(' ') + 1);
+        super(label, vscode.TreeItemCollapsibleState.None);
+        this.id = id;
+        this.tooltip = new vscode.MarkdownString();
+        this.tooltip.isTrusted = true;
+        this.tooltip.appendMarkdown(`${id.split(' ').join('.')}\n\n`);
+        for (const loc of debugItem.src) {
+            const sourceRelativePath = vscode.workspace.asRelativePath(loc.file);
+            this.tooltip.appendMarkdown(`- [${sourceRelativePath}:${loc.startLine}](${this.openCommandUri(loc)})`);
+        }
+        switch (debugItem.type) {
+        case 'node':
+            this.iconPath = new vscode.ThemeIcon('symbol-variable');
+            break;
+        case 'memory':
+            this.iconPath = new vscode.ThemeIcon('symbol-array');
+            break;
+        }
+        if (debugItem.width !== 1) {
+            const configuration = vscode.workspace.getConfiguration('cxxrtlDebugger');
+            this.description = "";
+            switch (configuration.rangeStyle) {
+            case 'Verilog/VHDL':
+                this.description += `[${debugItem.lsb_at + debugItem.width - 1}:${debugItem.lsb_at}]`;
+                if (debugItem.type === 'memory') {
+                    this.description += ` [${debugItem.zero_at}:${debugItem.zero_at + debugItem.depth - 1}]`;
+                }
+                break;
+            case 'Python':
+                if (debugItem.type === 'memory') {
+                    if (debugItem.zero_at === 0) {
+                        this.description += `[${debugItem.depth}] `;
+                    } else {
+                        this.description += `[${debugItem.zero_at}:${debugItem.zero_at + debugItem.depth}] `;
+                    }
+                }
+                if (debugItem.lsb_at === 0) {
+                    this.description += `[${debugItem.width}]`;
+                } else {
+                    this.description += `[${debugItem.lsb_at}:${debugItem.lsb_at + debugItem.width}]`;
+                }
+                break;
+            }
+        }
+        if (debugItem.src.length > 0) {
+            this.command = {
+                title: "Reveal in Editor",
+                command: 'vscode.open',
+                arguments: this.openCommandArguments(debugItem.src[0])
+            };
+        }
+    }
+
     private openCommandArguments(loc: ICXXRTLSourceLocation): [vscode.Uri, vscode.TextDocumentShowOptions] {
         const position = new vscode.Position(loc.startLine - 1, (loc.startColumn ?? 1) - 1);
         return [
@@ -17,41 +73,8 @@ export class CXXRTLVariableTreeItem extends vscode.TreeItem {
 
     private openCommandUri(loc: ICXXRTLSourceLocation): vscode.Uri {
         const args = this.openCommandArguments(loc);
+        // FIXME: this doesn't seem to navigate to `selection`
         return vscode.Uri.parse(`command:vscode.open?${encodeURIComponent(JSON.stringify(args))}`);
-    }
-
-    constructor(
-        public readonly id: string,
-        public readonly debugItem: ICXXRTLDebugItem
-    ) {
-        const label = id.substring(id.lastIndexOf(' '));
-        super(label, vscode.TreeItemCollapsibleState.None);
-        this.tooltip = new vscode.MarkdownString();
-        this.tooltip.isTrusted = true;
-        this.tooltip.appendMarkdown(`${id.split(' ').join('.')}\n\n`);
-        for (const loc of this.debugItem.src) {
-            const sourceRelativePath = vscode.workspace.asRelativePath(loc.file);
-            this.tooltip.appendMarkdown(`- [${sourceRelativePath}:${loc.startLine}](${this.openCommandUri(loc)})`);
-        }
-        if (debugItem.type === 'node') {
-            this.iconPath = new vscode.ThemeIcon('symbol-variable');
-        }
-        if (debugItem.type === 'memory') {
-            this.iconPath = new vscode.ThemeIcon('symbol-array');
-        }
-        if (debugItem.width !== 1) {
-            this.description = `[${debugItem.lsb_at}:${debugItem.lsb_at + debugItem.width}]`;
-            if (debugItem.type === 'memory') {
-                this.description += ` [${debugItem.zero_at}:${debugItem.zero_at + debugItem.depth}]`;
-            }
-        }
-        if (this.debugItem.src.length > 0) {
-            this.command = {
-                title: "Reveal in Editor",
-                command: 'vscode.open',
-                arguments: this.openCommandArguments(this.debugItem.src[0])
-            };
-        }
     }
 }
 
@@ -67,6 +90,11 @@ export class CXXRTLVariableTreeDataProvider implements vscode.TreeDataProvider<C
     ) {
         this.cxxrtlDebugger.onDidChangeSessionState((_state) => {
             this._onDidChangeTreeData.fire(null);
+        });
+        vscode.workspace.onDidChangeConfiguration((event) => {
+            if (event.affectsConfiguration('cxxrtlDebugger.rangeStyle')) {
+                this._onDidChangeTreeData.fire(null);
+            }
         });
     }
 

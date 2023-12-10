@@ -38,7 +38,7 @@ export function activate(context: vscode.ExtensionContext) {
         if (event.selection.length !== 0) {
             cxxrtlVariableTreeDataProvider.scope = event.selection[0].id;
         } else {
-            cxxrtlVariableTreeDataProvider.scope = "";
+            cxxrtlVariableTreeDataProvider.scope = '';
         }
         // UPSTREAM: It's not currently possible to un-select elements in a contributed tree. See microsoft/vscode#48754.
         // cxxrtlVariableTreeView.unSelect();

@@ -2,12 +2,12 @@ import * as vscode from 'vscode';
 import { CXXRTLDebugger } from './debugger';
 
 export class CXXRTLHierarchyTreeItem extends vscode.TreeItem {
-    constructor(
-        public readonly id: string,
-        public readonly collapsibleState: vscode.TreeItemCollapsibleState
-    ) {
+    public override id: string;
+
+    constructor(id: string, collapsibleState: vscode.TreeItemCollapsibleState) {
         const label = id.substring(id.lastIndexOf(' ') + 1);
         super(label, collapsibleState);
+        this.id = id;
         this.tooltip = id.split(' ').join('.');
         this.iconPath = new vscode.ThemeIcon("symbol-module");
     }
@@ -42,7 +42,7 @@ export class CXXRTLHierarchyTreeDataProvider implements vscode.TreeDataProvider<
     }
 
     public getChildren(element?: CXXRTLHierarchyTreeItem): vscode.ProviderResult<CXXRTLHierarchyTreeItem[]> {
-        return this.getScopesIn(element?.id ?? "").map((scope) => {
+        return this.getScopesIn(element?.id ?? '').map((scope) => {
             const collapsibleState = this.getScopesIn(scope).length > 0
                 ? vscode.TreeItemCollapsibleState.Collapsed
                 : vscode.TreeItemCollapsibleState.None;

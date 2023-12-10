@@ -37,7 +37,7 @@ export class CXXRTLDebugger {
             return;
         }
 
-        const configuration = this.workspaceConfiguration();
+        const configuration = vscode.workspace.getConfiguration('cxxrtlDebugger');
         if (configuration.command.length !== 0) {
             this.terminal = vscode.window.createTerminal({
                 name: "CXXRTL Simulation",
@@ -114,10 +114,6 @@ export class CXXRTLDebugger {
             return new Map();
         }
         return await this.connection.listItems(scope);
-    }
-
-    private workspaceConfiguration(): vscode.WorkspaceConfiguration {
-        return vscode.workspace.getConfiguration('cxxrtlDebugger');
     }
 
     private setSessionState(sessionState: CXXRTLSessionState): void {
