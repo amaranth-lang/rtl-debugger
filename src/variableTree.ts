@@ -1,60 +1,86 @@
 import * as vscode from 'vscode';
 import { CXXRTLDebugger } from './debugger';
-import { ICXXRTLDebugItem, ICXXRTLSourceLocation } from './connection';
+import { CXXRTLDebugItem, CXXRTLDebugItemType, ICXXRTLSourceLocation } from './connection';
 
 export class CXXRTLVariableTreeItem extends vscode.TreeItem {
     public override id: string;
 
-    constructor(id: string, debugItem: ICXXRTLDebugItem) {
+    constructor(id: string, debugItem: CXXRTLDebugItem, value: bigint | undefined) {
         const label = id.substring(id.lastIndexOf(' ') + 1);
         super(label, vscode.TreeItemCollapsibleState.None);
         this.id = id;
         this.tooltip = new vscode.MarkdownString();
         this.tooltip.isTrusted = true;
         this.tooltip.appendMarkdown(`${id.split(' ').join('.')}\n\n`);
-        for (const loc of debugItem.src) {
-            const sourceRelativePath = vscode.workspace.asRelativePath(loc.file);
-            this.tooltip.appendMarkdown(`- [${sourceRelativePath}:${loc.startLine}](${this.openCommandUri(loc)})`);
+        for (const location of debugItem.sourceLocations) {
+            const sourceRelativePath = vscode.workspace.asRelativePath(location.file);
+            this.tooltip.appendMarkdown(`- [${sourceRelativePath}:${location.startLine}](${this.openCommandUri(location)})`);
         }
         switch (debugItem.type) {
-        case 'node':
-            this.iconPath = new vscode.ThemeIcon('symbol-variable');
-            break;
-        case 'memory':
-            this.iconPath = new vscode.ThemeIcon('symbol-array');
-            break;
+            case 'node':
+                this.iconPath = new vscode.ThemeIcon('symbol-variable');
+                break;
+            case 'memory':
+                this.iconPath = new vscode.ThemeIcon('symbol-array');
+                break;
         }
+        this.description = '';
+        const displayStyle = vscode.workspace.getConfiguration('cxxrtlDebugger').get('displayStyle');
         if (debugItem.width !== 1) {
-            const configuration = vscode.workspace.getConfiguration('cxxrtlDebugger');
-            this.description = "";
-            switch (configuration.rangeStyle) {
-            case 'Verilog/VHDL':
-                this.description += `[${debugItem.lsb_at + debugItem.width - 1}:${debugItem.lsb_at}]`;
-                if (debugItem.type === 'memory') {
-                    this.description += ` [${debugItem.zero_at}:${debugItem.zero_at + debugItem.depth - 1}]`;
-                }
-                break;
-            case 'Python':
-                if (debugItem.type === 'memory') {
-                    if (debugItem.zero_at === 0) {
-                        this.description += `[${debugItem.depth}] `;
-                    } else {
-                        this.description += `[${debugItem.zero_at}:${debugItem.zero_at + debugItem.depth}] `;
+            switch (displayStyle) {
+                case 'Verilog':
+                case 'VHDL':
+                    this.description += `[${debugItem.lsbAt + debugItem.width - 1}:${debugItem.lsbAt}]`;
+                    if (debugItem.type === CXXRTLDebugItemType.Memory) {
+                        this.description += ` [${debugItem.zeroAt}:${debugItem.zeroAt! + debugItem.depth! - 1}]`;
                     }
+                    break;
+
+                case 'Python':
+                    if (debugItem.type === CXXRTLDebugItemType.Memory) {
+                        if (debugItem.zeroAt === 0) {
+                            this.description += `[${debugItem.depth}] `;
+                        } else {
+                            this.description += `[${debugItem.zeroAt}:${debugItem.zeroAt! + debugItem.depth!}] `;
+                        }
+                    }
+                    if (debugItem.lsbAt === 0) {
+                        this.description += `[${debugItem.width}]`;
+                    } else {
+                        this.description += `[${debugItem.lsbAt}:${debugItem.lsbAt + debugItem.width}]`;
+                    }
+                    break;
                 }
-                if (debugItem.lsb_at === 0) {
-                    this.description += `[${debugItem.width}]`;
-                } else {
-                    this.description += `[${debugItem.lsb_at}:${debugItem.lsb_at + debugItem.width}]`;
+        }
+        if (value !== undefined) {
+            if (this.description !== '') {
+                this.description += ' = ';
+            } else {
+                this.description += '= ';
+            }
+            if (debugItem.width === 1) {
+                this.description += value.toString();
+            } else {
+                switch (displayStyle) {
+                    case 'Verilog':
+                        this.description += `16'${value.toString(16)}`;
+                        break;
+
+                    case 'VHDL':
+                        this.description += `X"${value.toString(16)}"`;
+                        break;
+
+                    case 'Python':
+                        this.description += `0x${value.toString(16)}`;
+                        break;
                 }
-                break;
             }
         }
-        if (debugItem.src.length > 0) {
+        if (debugItem.sourceLocations.length > 0) {
             this.command = {
                 title: "Reveal in Editor",
                 command: 'vscode.open',
-                arguments: this.openCommandArguments(debugItem.src[0])
+                arguments: this.openCommandArguments(debugItem.sourceLocations[0])
             };
         }
     }
@@ -88,11 +114,14 @@ export class CXXRTLVariableTreeDataProvider implements vscode.TreeDataProvider<C
     constructor(
         readonly cxxrtlDebugger: CXXRTLDebugger,
     ) {
-        this.cxxrtlDebugger.onDidChangeSessionState((_state) => {
+        this.cxxrtlDebugger.onDidChangeSessionStatus((_state) => {
+            this._onDidChangeTreeData.fire(null);
+        });
+        this.cxxrtlDebugger.onDidChangeCurrentTime((_time) => {
             this._onDidChangeTreeData.fire(null);
         });
         vscode.workspace.onDidChangeConfiguration((event) => {
-            if (event.affectsConfiguration('cxxrtlDebugger.rangeStyle')) {
+            if (event.affectsConfiguration('cxxrtlDebugger.displayStyle')) {
                 this._onDidChangeTreeData.fire(null);
             }
         });
@@ -103,27 +132,23 @@ export class CXXRTLVariableTreeDataProvider implements vscode.TreeDataProvider<C
         this._onDidChangeTreeData.fire(null);
     }
 
-    private getVariablesIn(scope: string): Promise<Map<string, ICXXRTLDebugItem>> {
-        return this.cxxrtlDebugger.listVariables(scope);
-    }
-
     public getTreeItem(element: CXXRTLVariableTreeItem): vscode.TreeItem {
         return element;
     }
 
-    public getChildren(element?: CXXRTLVariableTreeItem): vscode.ProviderResult<CXXRTLVariableTreeItem[]> {
+    public async getChildren(element?: CXXRTLVariableTreeItem): Promise<CXXRTLVariableTreeItem[]> {
         if (element) {
             // TODO: expand signals and memories
             return [];
-        } else {
-            return this.getVariablesIn(this.scope).then((variables) => {
-                let elements: CXXRTLVariableTreeItem[] = [];
-                for (let [id, description] of variables) {
-                    elements.push(new CXXRTLVariableTreeItem(id, description));
-                }
-                return elements;
-            });
         }
+
+        const variables = await this.cxxrtlDebugger.listVariables(this.scope);
+        const values = await this.cxxrtlDebugger.getVariableValues(Array.from(variables.values()));
+        let elements: CXXRTLVariableTreeItem[] = [];
+        for (let [name, description] of variables) {
+            elements.push(new CXXRTLVariableTreeItem(name, description, values.get(name)));
+        }
+        return elements;
     }
 }
 

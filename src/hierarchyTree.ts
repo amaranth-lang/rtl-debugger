@@ -20,7 +20,7 @@ export class CXXRTLHierarchyTreeDataProvider implements vscode.TreeDataProvider<
     constructor(
         readonly cxxrtlDebugger: CXXRTLDebugger
     ) {
-        cxxrtlDebugger.onDidChangeSessionState((_state) => {
+        cxxrtlDebugger.onDidChangeSessionStatus((_state) => {
             this._onDidChangeTreeData.fire(null);
         });
     }
