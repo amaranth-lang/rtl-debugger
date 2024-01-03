@@ -86,7 +86,7 @@ export class CXXRTLVariableTreeItem extends vscode.TreeItem {
     }
 
     private openCommandArguments(loc: ICXXRTLSourceLocation): [vscode.Uri, vscode.TextDocumentShowOptions] {
-        const position = new vscode.Position(loc.startLine - 1, (loc.startColumn ?? 1) - 1);
+        const position = new vscode.Position((loc.startLine || 1) - 1, (loc.startColumn || 1) - 1);
         return [
             vscode.Uri.parse(loc.file),
             {
