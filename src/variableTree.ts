@@ -25,7 +25,7 @@ export class CXXRTLVariableTreeItem extends vscode.TreeItem {
                 break;
         }
         this.description = '';
-        const displayStyle = vscode.workspace.getConfiguration('cxxrtlDebugger').get('displayStyle');
+        const displayStyle = vscode.workspace.getConfiguration('rtlDebugger').get('displayStyle');
         if (debugItem.width !== 1) {
             switch (displayStyle) {
                 case 'Verilog':
@@ -112,16 +112,16 @@ export class CXXRTLVariableTreeDataProvider implements vscode.TreeDataProvider<C
     readonly onDidChangeTreeData: vscode.Event<CXXRTLVariableTreeItem | null> = this._onDidChangeTreeData.event;
 
     constructor(
-        readonly cxxrtlDebugger: CXXRTLDebugger,
+        readonly rtlDebugger: CXXRTLDebugger,
     ) {
-        this.cxxrtlDebugger.onDidChangeSessionStatus((_state) => {
+        this.rtlDebugger.onDidChangeSessionStatus((_state) => {
             this._onDidChangeTreeData.fire(null);
         });
-        this.cxxrtlDebugger.onDidChangeCurrentTime((_time) => {
+        this.rtlDebugger.onDidChangeCurrentTime((_time) => {
             this._onDidChangeTreeData.fire(null);
         });
         vscode.workspace.onDidChangeConfiguration((event) => {
-            if (event.affectsConfiguration('cxxrtlDebugger.displayStyle')) {
+            if (event.affectsConfiguration('rtlDebugger.displayStyle')) {
                 this._onDidChangeTreeData.fire(null);
             }
         });
@@ -142,8 +142,8 @@ export class CXXRTLVariableTreeDataProvider implements vscode.TreeDataProvider<C
             return [];
         }
 
-        const variables = await this.cxxrtlDebugger.listVariables(this.scope);
-        const values = await this.cxxrtlDebugger.getVariableValues(Array.from(variables.values()));
+        const variables = await this.rtlDebugger.listVariables(this.scope);
+        const values = await this.rtlDebugger.getVariableValues(Array.from(variables.values()));
         let elements: CXXRTLVariableTreeItem[] = [];
         for (let [name, description] of variables) {
             elements.push(new CXXRTLVariableTreeItem(name, description, values.get(name)));

@@ -195,7 +195,7 @@ export class CXXRTLConnection {
     }
 
     private sendPacket(packet: any) {
-        console.log("[CXXRTL Debugger] C>S:", packet);
+        console.log("[RTL Debugger] C>S:", packet);
         this.stream.write(JSON.stringify(packet) + '\0');
     }
 
@@ -219,7 +219,7 @@ export class CXXRTLConnection {
                 }
                 // At this point, we have a complete packet in chunks inside `buffer`.
                 const packet = JSON.parse(buffer.join(''));
-                console.log("[CXXRTL Debugger] S>C:", packet);
+                console.log("[RTL Debugger] S>C:", packet);
                 resolve(packet);
                 // Remove the callbacks.
                 stream.off('data', onData);

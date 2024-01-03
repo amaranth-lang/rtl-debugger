@@ -44,9 +44,9 @@ export class CXXRTLDebugger {
     readonly onDidChangeLatestTime: vscode.Event<TimePoint> = this._onDidChangeLatestTime.event;
 
     constructor() {
-        this.statusItem = vscode.window.createStatusBarItem('cxxrtlDebugger', vscode.StatusBarAlignment.Left, 10);
+        this.statusItem = vscode.window.createStatusBarItem('rtlDebugger', vscode.StatusBarAlignment.Left, 10);
         this.statusItem.tooltip = 'RTL Debugger Status';
-        this.statusItem.command = 'cxxrtlDebugger.runPauseSimulation';
+        this.statusItem.command = 'rtlDebugger.runPauseSimulation';
         this.onDidChangeSessionStatus((_state) => this.updateStatusItem());
         this.onDidChangeCurrentTime((_time) => this.updateStatusItem());
         this.onDidChangeSimulationStatus((_state) => this.updateStatusItem());
@@ -89,7 +89,7 @@ export class CXXRTLDebugger {
             return;
         }
 
-        const configuration = vscode.workspace.getConfiguration('cxxrtlDebugger');
+        const configuration = vscode.workspace.getConfiguration('rtlDebugger');
         if (configuration.command.length !== 0) {
             this.terminal = vscode.window.createTerminal({
                 name: "CXXRTL Simulation",
@@ -101,7 +101,7 @@ export class CXXRTLDebugger {
             this.setSessionStatus(CXXRTLSessionStatus.Starting);
 
             const processId = await this.terminal.processId;
-            console.log("[CXXRTL Debugger] Launched process %d", processId);
+            console.log("[RTL Debugger] Launched process %d", processId);
 
             setTimeout(() => {
                 const socket = net.createConnection({ port: configuration.port, host: '::1' }, () => {
@@ -113,14 +113,14 @@ export class CXXRTLDebugger {
                                 vscode.window.showErrorMessage(`The CXXRTL server has returned an error: ${serverError.message}`);
                             },
                             (clientError) => {
-                                vscode.window.showErrorMessage(`The CXXRTL debugger has encountered an error: ${clientError.message}`);
+                                vscode.window.showErrorMessage(`The RTL debugger has encountered an error: ${clientError.message}`);
                             });
 
                         const _capabilities = await this.connection.exchangeGreeting();
                         this._scopes = await this.connection.listScopes();
                         this.setSessionStatus(CXXRTLSessionStatus.Running);
                         this.updateSimulationStatus();
-                        console.log("[CXXRTL Debugger] Initialized");
+                        console.log("[RTL Debugger] Initialized");
                     })().catch(() => {
                         this.stopSession();
                     });
@@ -144,7 +144,7 @@ export class CXXRTLDebugger {
             const OpenSettings = "Open Settings";
             const selection = await vscode.window.showErrorMessage("Configure the launch command to start a debug session.", OpenSettings);
             if (selection === OpenSettings) {
-                vscode.commands.executeCommand('workbench.action.openSettings', 'cxxrtlDebugger.command');
+                vscode.commands.executeCommand('workbench.action.openSettings', 'rtlDebugger.command');
             }
         }
     }

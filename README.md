@@ -1,4 +1,4 @@
-# CXXRTL Debugger for VSCode
+# RTL Debugger for VSCode
 
 TODO
 

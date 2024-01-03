@@ -18,20 +18,20 @@ export class CXXRTLHierarchyTreeDataProvider implements vscode.TreeDataProvider<
     readonly onDidChangeTreeData: vscode.Event<CXXRTLHierarchyTreeItem | null> = this._onDidChangeTreeData.event;
 
     constructor(
-        readonly cxxrtlDebugger: CXXRTLDebugger
+        readonly rtlDebugger: CXXRTLDebugger
     ) {
-        cxxrtlDebugger.onDidChangeSessionStatus((_state) => {
+        rtlDebugger.onDidChangeSessionStatus((_state) => {
             this._onDidChangeTreeData.fire(null);
         });
     }
 
     private getScopesIn(parentScope: string): string[] {
         if (parentScope === '') {
-            return this.cxxrtlDebugger.scopes.filter((scope) => {
+            return this.rtlDebugger.scopes.filter((scope) => {
                 return scope !== '' && scope.indexOf(' ') === -1;
             });
         } else {
-            return this.cxxrtlDebugger.scopes.filter((scope) => {
+            return this.rtlDebugger.scopes.filter((scope) => {
                 return scope.substring(0, scope.lastIndexOf(' ')) === parentScope;
             });
         }

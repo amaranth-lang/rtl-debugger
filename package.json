@@ -1,6 +1,6 @@
 {
-  "name": "cxxrtldebugger",
-  "displayName": "CXXRTL Debugger",
+  "name": "rtl-debugger",
+  "displayName": "RTL Debugger",
   "description": "Debugger for HDLs supported by the open-source toolchain: Amaranth, Verilog, VHDL, ...",
   "version": "0.0.0",
   "engines": {
@@ -13,12 +13,12 @@
   "main": "./out/extension.js",
   "contributes": {
     "configuration": {
-      "id": "CXXRTLDebugger",
+      "id": "RTLDebugger",
       "type": "object",
-      "title": "CXXRTL Debugger",
+      "title": "RTL Debugger",
       "$comment": "UPSTREAM: Unfortunately there is no way to control the formatting of the extension name within the setting title. See microsoft/vscode#103592",
       "properties": {
-        "cxxrtlDebugger.command": {
+        "rtlDebugger.command": {
           "type": ["array"],
           "items": {
             "type": "string"
@@ -26,19 +26,19 @@
           "minItems": 1,
           "description": "Specifies the command to run when launching a debug session."
         },
-        "cxxrtlDebugger.cwd": {
+        "rtlDebugger.cwd": {
           "type": "string",
           "default": "${workspaceFolder}",
           "description": "Specifies the working directory for the launch command."
         },
-        "cxxrtlDebugger.port": {
+        "rtlDebugger.port": {
           "type": "integer",
           "minimum": 1,
           "maximum": 65535,
           "default": 6618,
           "description": "Specifies the port that the CXXRTL agent within the debug session is listening at."
         },
-        "cxxrtlDebugger.displayStyle": {
+        "rtlDebugger.displayStyle": {
           "enum": ["Verilog", "VHDL", "Python"],
           "default": "Verilog",
           "markdownDescription": "Specifies the display format for variables."
@@ -47,123 +47,123 @@
     },
     "commands": [
       {
-        "command": "cxxrtlDebugger.startSession",
-        "category": "CXXRTL Debugger",
+        "command": "rtlDebugger.startSession",
+        "category": "RTL Debugger",
         "title": "Start Session"
       },
       {
-        "command": "cxxrtlDebugger.stopSession",
-        "category": "CXXRTL Debugger",
+        "command": "rtlDebugger.stopSession",
+        "category": "RTL Debugger",
         "title": "Stop Session"
       },
       {
-        "command": "cxxrtlDebugger.runSimulation",
-        "category": "CXXRTL Debugger",
+        "command": "rtlDebugger.runSimulation",
+        "category": "RTL Debugger",
         "title": "Run Simulation"
       },
       {
-        "command": "cxxrtlDebugger.runSimulationUntil",
-        "category": "CXXRTL Debugger",
+        "command": "rtlDebugger.runSimulationUntil",
+        "category": "RTL Debugger",
         "title": "Run Simulation Until..."
       },
       {
-        "command": "cxxrtlDebugger.pauseSimulation",
-        "category": "CXXRTL Debugger",
+        "command": "rtlDebugger.pauseSimulation",
+        "category": "RTL Debugger",
         "title": "Pause Simulation"
       },
       {
-        "command": "cxxrtlDebugger.stepForward",
-        "category": "CXXRTL Debugger",
+        "command": "rtlDebugger.stepForward",
+        "category": "RTL Debugger",
         "title": "Step Forward"
       },
       {
-        "command": "cxxrtlDebugger.stepBackward",
-        "category": "CXXRTL Debugger",
+        "command": "rtlDebugger.stepBackward",
+        "category": "RTL Debugger",
         "title": "Step Backward"
       }
     ],
     "viewsContainers": {
       "activitybar": [
         {
-          "id": "cxxrtlDebugger",
-          "title": "CXXRTL Debugger",
+          "id": "rtlDebugger",
+          "title": "RTL Debugger",
           "icon": "media/chip-debug.svg"
         }
       ]
     },
     "views": {
-      "cxxrtlDebugger": [
+      "rtlDebugger": [
         {
-          "id": "cxxrtlDebugger.hierarchy",
+          "id": "rtlDebugger.hierarchy",
           "name": "Hierarchy"
         },
         {
-          "id": "cxxrtlDebugger.variables",
+          "id": "rtlDebugger.variables",
           "name": "Variables"
         }
       ]
     },
     "viewsWelcome": [
       {
-        "view": "cxxrtlDebugger.hierarchy",
-        "contents": "The debug session is not running.\n[Start Session](command:cxxrtlDebugger.startSession)",
-        "when": "cxxrtlDebugger.sessionStatus == absent"
+        "view": "rtlDebugger.hierarchy",
+        "contents": "The debug session is not running.\n[Start Session](command:rtlDebugger.startSession)",
+        "when": "rtlDebugger.sessionStatus == absent"
       },
       {
-        "view": "cxxrtlDebugger.hierarchy",
+        "view": "rtlDebugger.hierarchy",
         "contents": "The debug session is initializing...",
-        "when": "cxxrtlDebugger.sessionStatus == starting"
+        "when": "rtlDebugger.sessionStatus == starting"
       },
       {
-        "view": "cxxrtlDebugger.hierarchy",
+        "view": "rtlDebugger.hierarchy",
         "contents": "There are no scopes in the simulation.",
-        "when": "cxxrtlDebugger.sessionStatus == running"
+        "when": "rtlDebugger.sessionStatus == running"
       },
       {
-        "view": "cxxrtlDebugger.variables",
+        "view": "rtlDebugger.variables",
         "contents": "The selected scope is empty."
       }
     ],
     "menus": {
       "commandPalette": [
         {
-          "command": "cxxrtlDebugger.startSession",
-          "when": "cxxrtlDebugger.sessionStatus == absent"
+          "command": "rtlDebugger.startSession",
+          "when": "rtlDebugger.sessionStatus == absent"
         },
         {
-          "command": "cxxrtlDebugger.stopSession",
-          "when": "cxxrtlDebugger.sessionStatus == running"
+          "command": "rtlDebugger.stopSession",
+          "when": "rtlDebugger.sessionStatus == running"
         },
         {
-          "command": "cxxrtlDebugger.runSimulation",
-          "when": "cxxrtlDebugger.sessionStatus == running && cxxrtlDebugger.simulationStatus == paused"
+          "command": "rtlDebugger.runSimulation",
+          "when": "rtlDebugger.sessionStatus == running && rtlDebugger.simulationStatus == paused"
         },
         {
-          "command": "cxxrtlDebugger.runSimulationUntil",
-          "when": "cxxrtlDebugger.sessionStatus == running && cxxrtlDebugger.simulationStatus == paused"
+          "command": "rtlDebugger.runSimulationUntil",
+          "when": "rtlDebugger.sessionStatus == running && rtlDebugger.simulationStatus == paused"
         },
         {
-          "command": "cxxrtlDebugger.pauseSimulation",
-          "when": "cxxrtlDebugger.sessionStatus == running && cxxrtlDebugger.simulationStatus == running"
+          "command": "rtlDebugger.pauseSimulation",
+          "when": "rtlDebugger.sessionStatus == running && rtlDebugger.simulationStatus == running"
         },
         {
-          "command": "cxxrtlDebugger.stepForward",
-          "when": "cxxrtlDebugger.sessionStatus == running"
+          "command": "rtlDebugger.stepForward",
+          "when": "rtlDebugger.sessionStatus == running"
         },
         {
-          "command": "cxxrtlDebugger.stepBackward",
-          "when": "cxxrtlDebugger.sessionStatus == running"
+          "command": "rtlDebugger.stepBackward",
+          "when": "rtlDebugger.sessionStatus == running"
         }
       ]
     }
   },
   "scripts": {
-    "vscode:prepublish": "npm run compile",
     "compile": "tsc -p ./",
     "watch": "tsc -watch -p ./",
-    "pretest": "npm run compile && npm run lint",
     "lint": "eslint src --ext ts",
-    "test": "vscode-test"
+    "pretest": "npm run compile && npm run lint",
+    "test": "vscode-test",
+    "vscode:prepublish": "npm run compile"
   },
   "devDependencies": {
     "@types/vscode": "^1.84.0",
