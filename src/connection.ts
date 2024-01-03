@@ -204,10 +204,6 @@ export class CXXRTLConnection {
             const stream = this.stream;
             const buffer: string[] = [];
             const onData = (data: string) => {
-                // Remove the callbacks.
-                stream.off('data', onData);
-                stream.off('error', onError);
-                stream.off('end', onError);
                 // Process the packet.
                 const packetEndIndex = data.indexOf('\0');
                 if (packetEndIndex === -1) {
@@ -225,6 +221,10 @@ export class CXXRTLConnection {
                 const packet = JSON.parse(buffer.join(''));
                 console.log("[CXXRTL Debugger] S>C:", packet);
                 resolve(packet);
+                // Remove the callbacks.
+                stream.off('data', onData);
+                stream.off('error', onError);
+                stream.off('end', onError);
             };
             const onError = (error: any) => {
                 reject(error ?? new Error(`The CXXRTL server has suddenly disconnected.`));
