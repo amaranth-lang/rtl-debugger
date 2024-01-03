@@ -1,0 +1,3 @@
+{
+    "rtlDebugger.command": ["${workspaceFolder}/design_sim"]
+}
