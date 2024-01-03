@@ -35,18 +35,34 @@ export class TimePoint {
     }
 
     public toString(): string {
+        function groupDecimals(num: bigint) {
+            let groups: string[] = [];
+            if (num === 0n) {
+                groups.push('0');
+            } else {
+                while (num !== 0n) {
+                    groups.push(`${num % 1000n}`);
+                    num /= 1000n;
+                }
+            }
+            return groups
+                .map((group, index) => index === groups.length - 1 ? group : group.padStart(3, '0'))
+                .reverse()
+                .join(',');
+        }
+
         if (this.#raw % 1_000_000_000_000_000n === 0n) {
-            return `${this.#raw / 1_000_000_000_000_000n}s`;
+            return `${groupDecimals(this.#raw / 1_000_000_000_000_000n)}s`;
         } else if (this.#raw % 1_000_000_000_000n === 0n) {
-            return `${this.#raw / 1_000_000_000_000n}ms`;
+            return `${groupDecimals(this.#raw / 1_000_000_000_000n)}ms`;
         } else if (this.#raw % 1_000_000_000n === 0n) {
-            return `${this.#raw / 1_000_000_000n}us`;
+            return `${groupDecimals(this.#raw / 1_000_000_000n)}us`;
         } else if (this.#raw % 1_000_000n === 0n) {
-            return `${this.#raw / 1_000_000n}ns`;
+            return `${groupDecimals(this.#raw / 1_000_000n)}ns`;
         } else if (this.#raw % 1_000n === 0n) {
-            return `${this.#raw / 1_000n}ps`;
+            return `${groupDecimals(this.#raw / 1_000n)}ps`;
         } else {
-            return `${this.#raw}fs`;
+            return `${groupDecimals(this.#raw)}fs`;
         }
     }
 
@@ -55,7 +71,7 @@ export class TimePoint {
         if (matches === null) {
             throw new SyntaxError(`${JSON.stringify(value)} is not a valid time point`);
         }
-        const mantissa = BigInt(matches[1]);
+        const mantissa = BigInt(matches[1].replaceAll(',', ''));
         switch (matches[2]) {
             case 's':
                 return new TimePoint(mantissa, 0n);
