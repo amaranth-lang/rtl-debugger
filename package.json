@@ -2,7 +2,7 @@
   "name": "rtl-debugger",
   "displayName": "RTL Debugger",
   "description": "Debugger for HDLs supported by the open-source toolchain: Amaranth, Verilog, VHDL, ...",
-  "version": "0.0.0",
+  "version": "0.0.1",
   "engines": {
     "vscode": "^1.84.0"
   },
