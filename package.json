@@ -163,12 +163,15 @@
     }
   },
   "scripts": {
-    "compile": "tsc -p ./",
-    "watch": "tsc -watch -p ./",
+    "tsc": "tsc -p .",
     "lint": "eslint src --ext ts",
-    "pretest": "npm run compile && npm run lint",
-    "test": "vscode-test",
-    "vscode:prepublish": "npm run compile"
+    "esbuild": "npm run esbuild:browser && npm run esbuild:node",
+    "esbuild:browser": "esbuild ./src/extension.ts --bundle --outdir=out/browser/ --sourcemap --external:vscode --format=cjs --platform=browser --define:USE_WEB_WORKERS=true",
+    "esbuild:browser:watch": "npm run esbuild:browser -- --watch",
+    "esbuild:node": "esbuild ./src/extension.ts --bundle --outdir=out/node/ --sourcemap --external:vscode --format=cjs --platform=node --define:USE_WEB_WORKERS=false",
+    "esbuild:node:watch": "npm run esbuild:node -- --watch",
+    "vscode:prepublish": "npm run esbuild:browser && npm run esbuild:node && npm run esbuild:nodeusb",
+    "browser": "vscode-test-web --coi --browserOption=--remote-debugging-port=9222 --extensionDevelopmentPath=. test"
   },
   "devDependencies": {
     "@types/vscode": "^1.84.0",
