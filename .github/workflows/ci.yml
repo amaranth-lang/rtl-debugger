@@ -1,0 +1,52 @@
+on:
+  push:
+    branches:
+      - main
+    tags:
+      - v*
+  pull_request:
+name: CI
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out source code
+        uses: actions/checkout@v4
+      - name: Set up Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: v20.x
+      - name: Install dependencies
+        run: npm install
+      - name: Typecheck code
+        run: npm run tsc
+      - name: Lint code
+        run: npm run lint
+      - name: List files to be packaged
+        run: npm exec vsce ls
+      - name: Package extension
+        run: npm exec vsce package
+      - name: Upload package artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: package
+          path: '*.vsix'
+  publish:
+    needs: build
+    runs-on: ubuntu-latest
+    if: github.event_name == 'push' && startsWith(github.event.ref, 'refs/tags/v')
+    steps:
+      - name: Set up Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: v20.x
+      - name: Install VSCE
+        run: npm install -g @vscode/vsce
+      - name: Download package artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: package
+      - name: Publish package
+        run: vsce publish -i *.vsix
+        env:
+          VSCE_PAT: ${{ secrets.VSCE_PAT }}

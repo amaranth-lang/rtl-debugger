@@ -1,0 +1,10 @@
+{
+    "files.exclude": {
+        ".vscode-test-web": true
+    },
+    "search.exclude": {
+        "out": true,
+        "**/node_modules": true
+    },
+    "typescript.tsc.autoDetect": "off"
+}

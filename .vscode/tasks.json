@@ -1,0 +1,48 @@
+{
+	"version": "2.0.0",
+	"tasks": [
+		{
+			"type": "npm",
+			"script": "esbuild:node:watch",
+			"problemMatcher": "$esbuild-watch",
+			"isBackground": true,
+			"presentation": {
+				"reveal": "never"
+			},
+			"group": {
+				"kind": "build"
+			}
+		},
+		{
+			"type": "npm",
+			"script": "esbuild:browser:watch",
+			"problemMatcher": "$esbuild-watch",
+			"isBackground": true,
+			"presentation": {
+				"reveal": "never"
+			},
+			"group": {
+				"kind": "build"
+			}
+		},
+		{
+			"type": "npm",
+			"script": "browser",
+			"problemMatcher": [],
+			"isBackground": true,
+			"presentation": {
+				"reveal": "never"
+			},
+			"group": {
+				"kind": "none",
+				"isDefault": true
+			},
+			"dependsOn": [
+				{
+					"type": "npm",
+					"script": "esbuild:browser:watch"
+				}
+			]
+		}
+	]
+}
