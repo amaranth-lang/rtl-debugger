@@ -1,0 +1,25 @@
+on:
+  push:
+    branches:
+      - main
+  pull_request:
+  merge_group:
+
+name: CI
+jobs:
+
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out source code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Set up NPM
+        uses: actions/setup-node@v4
+      - name: Install dependencies
+        run: |
+          npm install
+      - name: Run tests
+        run: |
+          npm test
