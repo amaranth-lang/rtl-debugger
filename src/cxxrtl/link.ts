@@ -1,23 +1,33 @@
 import * as stream from 'node:stream';
-
-import * as wire from './wire';
+import * as wire from './proto';
 
 export interface ILink {
-    send(packet: wire.ClientPacket): Promise<void>;
+    dispose(): void;
+
     onRecv: (packet: wire.ServerPacket) => Promise<void>;
-    onFail: (error: Error) => Promise<void>;
     onDone: () => Promise<void>;
+
+    send(packet: wire.ClientPacket): Promise<void>;
 };
 
-export type MockConversationStanza =
-[wire.ClientPacket, wire.ServerPacket | wire.ServerPacket[]];
-
 export class MockLink implements ILink {
-    constructor(private conversation: MockConversationStanza[]) {}
+    constructor(
+        private conversation: [wire.ClientPacket, wire.ServerPacket | wire.ServerPacket[]][]
+    ) {}
 
-    async send(clientPacket: wire.ClientPacket): Promise<void> {
+    public dispose(): void {
+        if (this.conversation.length !== 0) {
+            throw new Error('disposed of before end of conversation');
+        }
+    }
+
+    public async onRecv(_serverPacket: wire.ServerPacket): Promise<void> {}
+
+    public async onDone(): Promise<void> {}
+
+    public async send(clientPacket: wire.ClientPacket): Promise<void> {
         if (this.conversation.length === 0) {
-            throw new Error("premature end of conversation in mock link");
+            throw new Error('premature end of conversation');
         }
 
         const [[expectedClient, expectedServer], ...restOfConversation] = this.conversation;
@@ -31,8 +41,8 @@ export class MockLink implements ILink {
                 await this.onRecv(expectedServer);
             }
         } else {
-            console.error("unexpected client packet", clientPacket, "; expected:", expectedClient);
-            throw new Error("unexpected client packet in mock link");
+            console.error('unexpected client packet', clientPacket, '; expected:', expectedClient);
+            throw new Error('unexpected client packet');
         }
 
         if (restOfConversation.length === 0) {
@@ -41,62 +51,69 @@ export class MockLink implements ILink {
 
         this.conversation = restOfConversation;
     }
-
-    async onRecv(_serverPacket: wire.ServerPacket): Promise<void> {
-        throw new Error("must override onRecv");
-    }
-
-    async onFail(error: Error): Promise<void> {
-        throw error;
-    }
-
-    async onDone(): Promise<void> {}
 }
 
 export class NodeStreamLink implements ILink {
+    private recvBuffer: string[] = [];
+
     constructor(private readonly stream: stream.Duplex) {
-        const handleRecv = async (packetText: string) => {
+        stream.on('data', this.onStreamData.bind(this));
+        stream.on('end', this.onStreamEnd.bind(this));
+        stream.setEncoding('utf-8');
+    }
+
+    private async onStreamData(chunk: string): Promise<void> {
+        // First, split off complete packets and buffer the rest. This shouldn't ever throw errors;
+        // if it did, the reader could get desynchronized from the protocol.
+        const packetTexts: string[] = [];
+        const [first, ...rest] = chunk.split('\0');
+        this.recvBuffer.push(first);
+        if (rest.length > 0) {
+            packetTexts.push(this.recvBuffer.join(''));
+            rest.forEach((packetText, index) => {
+                if (index < rest.length - 1) {
+                    packetTexts.push(packetText);
+                }
+            });
+            this.recvBuffer.splice(0, this.recvBuffer.length, rest[-1]);
+        }
+
+        // Second, process the packets. This involves steps that may throw errors, so we catch
+        // them all. Also, the stream is paused so that this event handler isn't re-entered despite
+        // using `await` here.
+        this.stream.pause();
+        for (const packetText of packetTexts) {
             try {
                 const packet = JSON.parse(packetText) as wire.ServerPacket;
-                await this.onRecv(packet);
-            } catch (error) {
-                // Not a particularly great way to handle error in `onRecv`, but we don't have
-                // a better one.
-                if (error instanceof Error) {
-                    this.onFail(error);
+                try {
+                    await this.onRecv(packet);
+                } catch (error) {
+                    console.error('uncaught error in onRecv', error);
                 }
+            } catch (error) {
+                console.error('malformed JSON', packetText);
             }
-        };
-
-        const recvQueue: string[] = [];
-        stream.on("data", (chunk: string) => {
-            const [first, ...rest] = chunk.split("\0");
-            recvQueue.push(first);
-            if (rest.length > 0) {
-                handleRecv(recvQueue.join());
-                rest.forEach((packetText, index) => {
-                    if (index < rest.length - 1) {
-                        handleRecv(packetText);
-                    }
-                });
-                recvQueue.splice(0, recvQueue.length, rest[-1]);
-            }
-        });
-        stream.on("error", (error) => this.onFail(error));
-        stream.on("end", () => this.onDone());
+        }
+        this.stream.resume();
     }
 
-    async send(clientPacket: wire.ClientPacket): Promise<void> {
+    private async onStreamEnd(): Promise<void> {
+        try {
+            await this.onDone();
+        } catch (error) {
+            console.error('uncaught error in onDone', error);
+        }
+    }
+
+    public dispose(): void {
+        this.stream.destroy();
+    }
+
+    public async onRecv(_serverPacket: wire.ServerPacket): Promise<void> {}
+
+    public async onDone(): Promise<void> {}
+
+    public async send(clientPacket: wire.ClientPacket): Promise<void> {
         this.stream.write(JSON.stringify(clientPacket) + '\0');
     }
-
-    async onRecv(_serverPacket: wire.ServerPacket): Promise<void> {
-        throw new Error("must override onRecv");
-    }
-
-    async onFail(error: Error): Promise<void> {
-        throw error;
-    }
-
-    async onDone(): Promise<void> {}
 }

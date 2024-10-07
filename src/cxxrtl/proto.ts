@@ -6,12 +6,12 @@
 // ## Message type: Greeting
 
 export type ClientGreeting = {
-    type: "greeting";
+    type: 'greeting';
     version: 0;
 };
 
 export type ServerGreeting = {
-    type: "greeting";
+    type: 'greeting';
     version: 0;
     commands: string[];
     events: string[];
@@ -23,7 +23,7 @@ export type ServerGreeting = {
 // ## Message type: Command
 
 export type Command = {
-    type: "command";
+    type: 'command';
     command: string;
     [argument: string]: any;
 };
@@ -31,20 +31,20 @@ export type Command = {
 // ## Message type: Response
 
 export type Response = {
-    type: "command";
+    type: 'command';
     command: string;
     [argument: string]: any;
 };
 
 export type Error = {
-    type: "error";
+    type: 'error';
     error: string;
     [argument: string]: any;
     message: string;
 };
 
 export type Event = {
-    type: "event";
+    type: 'event';
     event: string;
     [argument: string]: any;
 };
@@ -54,22 +54,22 @@ export type Event = {
 // ## Attributes
 
 export type AttributeUnsignedInt = {
-    type: "unsigned_int";
+    type: 'unsigned_int';
     value: string;
 };
 
 export type AttributeSignedInt = {
-    type: "signed_int";
+    type: 'signed_int';
     value: string;
 };
 
 export type AttributeString = {
-    type: "string";
+    type: 'string';
     value: string;
 };
 
 export type AttributeDouble = {
-    type: "double";
+    type: 'double';
     value: number;
 };
 
@@ -86,7 +86,7 @@ export type AttributeMap = {
 // ## Command: List Scopes
 
 export type ScopeDescriptionModule = {
-    type: "module";
+    type: 'module';
     definition: {
         src: null | string;
         name: null | string;
@@ -102,13 +102,13 @@ export type ScopeDescription =
 | ScopeDescriptionModule;
 
 export type CommandListScopes = {
-    type: "command";
-    command: "list_scopes";
+    type: 'command';
+    command: 'list_scopes';
 };
 
 export type ResponseListScopes = {
-    type: "response";
-    command: "list_scopes";
+    type: 'response';
+    command: 'list_scopes';
     scopes: {
         [identifier: string]: ScopeDescription;
     };
@@ -118,7 +118,7 @@ export type ResponseListScopes = {
 
 export type ItemDescriptionNode = {
     src: null | string;
-    type: "node";
+    type: 'node';
     lsb_at: number;
     width: number;
     input: boolean;
@@ -129,7 +129,7 @@ export type ItemDescriptionNode = {
 
 export type ItemDescriptionMemory = {
     src: null | string;
-    type: "memory";
+    type: 'memory';
     lsb_at: number;
     width: number;
     zero_at: number;
@@ -143,14 +143,14 @@ export type ItemDescription =
 | ItemDescriptionMemory;
 
 export type CommandListItems = {
-    type: "command";
-    command: "list_items";
+    type: 'command';
+    command: 'list_items';
     scope: null | string;
 };
 
 export type ResponseListItems = {
-    type: "response";
-    command: "list_items";
+    type: 'response';
+    command: 'list_items';
     items: {
         [identifier: string]: ItemDescription;
     };
@@ -163,15 +163,15 @@ export type ItemDesignation =
 | [string, number, number];
 
 export type CommandReferenceItems = {
-    type: "command";
-    command: "reference_items";
+    type: 'command';
+    command: 'reference_items';
     reference: string;
     items: null | ItemDesignation[];
 };
 
 export type ResponseReferenceItems = {
-    type: "response";
-    response: "reference_items";
+    type: 'response';
+    response: 'reference_items';
 };
 
 // ## Command: Query Interval
@@ -179,10 +179,10 @@ export type ResponseReferenceItems = {
 export type TimePoint = string;
 
 export type DiagnosticType =
-| "break"
-| "print"
-| "assert"
-| "assume";
+| 'break'
+| 'print'
+| 'assert'
+| 'assume';
 
 export type Diagnostic = {
     type: DiagnosticType;
@@ -197,8 +197,8 @@ export type Sample = {
 };
 
 export type CommandQueryInterval = {
-    type: "command";
-    command: "query_interval";
+    type: 'command';
+    command: 'query_interval';
     interval: [TimePoint, TimePoint];
     collapse: boolean;
     items: string;
@@ -207,56 +207,56 @@ export type CommandQueryInterval = {
 };
 
 export type ResponseQueryInterval = {
-    type: "response";
-    command: "query_interval";
+    type: 'response';
+    command: 'query_interval';
     samples: Sample[];
 };
 
 // ## Command: Get Simulation Status
 
 export type CommandGetSimulationStatus = {
-    type: "command";
-    command: "get_simulation_status";
+    type: 'command';
+    command: 'get_simulation_status';
 };
 
 export type ResponseGetSimulationStatus = {
-    type: "response";
-    command: "get_simulation_status";
-    status: "paused";
+    type: 'response';
+    command: 'get_simulation_status';
+    status: 'paused';
     latest_time: TimePoint;
     next_sample_time: TimePoint;
 } | {
-    type: "response";
-    command: "get_simulation_status";
-    status: "running" | "finished";
+    type: 'response';
+    command: 'get_simulation_status';
+    status: 'running' | 'finished';
     latest_time: TimePoint;
 };
 
 // ## Command: Run Simulation
 
 export type CommandRunSimulation = {
-    type: "command";
-    command: "run_simulation";
-    until_time: TimePoint;
+    type: 'command';
+    command: 'run_simulation';
+    until_time: null | TimePoint;
     until_diagnostics: DiagnosticType[];
     sample_item_values: boolean;
 };
 
 export type ResponseRunSimulation = {
-    type: "response";
-    command: "run_simulation";
+    type: 'response';
+    command: 'run_simulation';
 };
 
 // ## Command: Pause Simulation
 
 export type CommandPauseSimulation = {
-    type: "command";
-    command: "pause_simulation";
+    type: 'command';
+    command: 'pause_simulation';
 };
 
 export type ResponsePauseSimulation = {
-    type: "response";
-    command: "pause_simulation";
+    type: 'response';
+    command: 'pause_simulation';
     time: TimePoint;
 };
 
@@ -265,13 +265,13 @@ export type ResponsePauseSimulation = {
 // ## Event: Simulation Paused
 
 export type PauseCause =
-| "until_time"
-| "until_diagnostics"
+| 'until_time'
+| 'until_diagnostics'
 ;
 
 export type EventSimulationPaused = {
-    type: "event";
-    event: "simulation_paused";
+    type: 'event';
+    event: 'simulation_paused';
     time: TimePoint;
     cause: PauseCause;
 };
@@ -279,8 +279,8 @@ export type EventSimulationPaused = {
 // ## Event: Simulation Finished
 
 export type EventSimulationFinished = {
-    type: "event";
-    event: "simulation_finished";
+    type: 'event';
+    event: 'simulation_finished';
     time: TimePoint;
 };
 
