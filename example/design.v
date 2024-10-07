@@ -1,3 +1,15 @@
+module counter(...);
+
+  input clk;
+  output reg [7:0] cnt = 0;
+  always @(posedge clk)
+    if (cnt < 13)
+      cnt <= cnt + 1;
+    else
+      cnt <= 0;
+
+endmodule
+
 (* top *)
 module top(...);
 
@@ -21,12 +33,11 @@ module top(...);
     message[12] = "\n";
   end
 
-  reg [7:0] index = 0;
-  always @(posedge clk)
-    if (index < 13)
-      index <= index + 1;
-    else
-      index <= 0;
+  wire [7:0] index;
+  counter counter_inst(
+    .clk(clk),
+    .cnt(index)
+  );
 
   assign data = message[index];
 

@@ -12,14 +12,15 @@ int main(int argc, char **argv) {
     return 1;
   }
 
-  cxxrtl::spool spool("spool.bin");
-  cxxrtl::agent<cxxrtl::tcp_link, cxxrtl_design::p_top> agent(spool);
+  cxxrtl_design::p_top top;
+  cxxrtl::agent<cxxrtl_design::p_top> agent(cxxrtl::spool("spool.bin"), top);
+
+  std::string uri = agent.start_debugging(cxxrtl::tcp_link());
+  fprintf(stderr, "Simulation started on %s\n", uri.c_str());
 
   agent.step();
-  fprintf(stderr, "Simulation started on cxxrtl+tcp://localhost:6618\n");
 
   size_t steps = 0;
-  auto &top = agent.get_toplevel();
   while (true) {
     agent.advance(1_ns);
     top.p_clk.set(false);

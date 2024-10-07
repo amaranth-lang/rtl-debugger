@@ -1,16 +1,10 @@
-import * as stream from 'stream';
+import * as cxxrtlLink from './cxxrtl/link';
+import * as cxxrtlServer from './cxxrtl/server';
 import { TimeInterval, TimePoint } from './time';
-
-const PROTOCOL_VERSION: number = 0;
 
 export interface ICXXRTLAgentError {
     name: string;
     message: string;
-}
-
-export interface ICXXRTLAgentCapabilities {
-    commands: string[];
-    events: string[];
 }
 
 export interface ICXXRTLSourceLocation {
@@ -121,8 +115,8 @@ export class CXXRTLReference implements ICXXRTLReference {
 }
 
 export enum CXXRTLSimulationStatus {
-    Running = "running",
     Paused = "paused",
+    Running = "running",
     Finished = "finished",
 }
 
@@ -162,131 +156,21 @@ export class CXXRTLSample {
 }
 
 export class CXXRTLConnection {
-    private packetInFlight: Promise<void> = Promise.resolve();
+    private connection: cxxrtlServer.Connection;
 
-    constructor(
-        private readonly stream: stream.Duplex,
-        private onServerError?: (error: ICXXRTLAgentError) => void,
-        private onClientError?: (error: Error) => void
-    ) {
-        this.stream = stream;
-        this.stream.setEncoding('utf-8');
-    }
-
-    public dispose(): void {
-        this.stream.destroy();
-    }
-
-    private async serverError(packet: any): Promise<void> {
-        if (this.onServerError) {
-            this.onServerError({
-                name: packet.error,
-                message: packet.message
-            });
-        }
-        throw new Error(`Server returned an error: ${packet.error} (${packet.message})`);
-    }
-
-    private async clientError(error: Error): Promise<void> {
-        if (this.onClientError) {
-            this.onClientError(error);
-        }
-        throw error;
-    }
-
-    private sendPacket(packet: any) {
-        console.log("[RTL Debugger] C>S:", packet);
-        this.stream.write(JSON.stringify(packet) + '\0');
-    }
-
-    private recvPacket(): Promise<any> {
-        return (this.packetInFlight = new Promise((resolve, reject) => {
-            const stream = this.stream;
-            const buffer: string[] = [];
-            const onData = (data: string) => {
-                // Process the packet.
-                const packetEndIndex = data.indexOf('\0');
-                if (packetEndIndex === -1) {
-                    buffer.push(data);
-                    return;
-                } else {
-                    const beforePacketEnd = data.substring(0, packetEndIndex);
-                    const afterPacketEnd = data.substring(packetEndIndex + 1);
-                    buffer.push(beforePacketEnd);
-                    if (afterPacketEnd !== '') {
-                        stream.unshift(afterPacketEnd);
-                    }
-                }
-                // At this point, we have a complete packet in chunks inside `buffer`.
-                const packet = JSON.parse(buffer.join(''));
-                console.log("[RTL Debugger] S>C:", packet);
-                resolve(packet);
-                // Remove the callbacks.
-                stream.off('data', onData);
-                stream.off('error', onError);
-                stream.off('end', onError);
-            };
-            const onError = (error: any) => {
-                reject(error ?? new Error(`The CXXRTL server has suddenly disconnected.`));
-                // Remove the callbacks.
-                stream.off('data', onData);
-                stream.off('error', onError);
-                stream.off('end', onError);
-            };
-            stream.on('data', onData);
-            stream.on('error', onError);
-            stream.on('end', onError);
-        }));
-    }
-
-    private async recvGreeting(): Promise<any> {
-        const response = await this.recvPacket();
-        if (response.type === 'greeting') {
-            return response;
-        } else if (response.type === 'error') {
-            await this.serverError(response);
-        } else {
-            await this.clientError(new Error(`Expected a greeting packet, received a ${response.type} packet instead`));
-        }
-    }
-
-    private async recvResponse(): Promise<any> {
-        const response = await this.recvPacket();
-        if (response.type === 'response') {
-            return response;
-        } else if (response.type === 'event') {
-            // TODO: process event
-            return await this.recvResponse();
-        } else if (response.type === 'error') {
-            await this.serverError(response);
-        } else {
-            await this.clientError(new Error(`Expected a response packet, received a ${response.type} packet instead`));
-        }
-    }
-
-    private async performCommand(packet: any): Promise<any> {
-        await this.packetInFlight; // wait for response to be received before sending next command
-        this.sendPacket(packet);
-        return this.recvResponse();
-    }
-
-    public async exchangeGreeting(): Promise<ICXXRTLAgentCapabilities> {
-        this.sendPacket({
-            type: 'greeting',
-            version: PROTOCOL_VERSION
-        });
-        const response = await this.recvGreeting();
-        if (response.version !== PROTOCOL_VERSION) {
-            await this.clientError(new Error(`The server version is not ${PROTOCOL_VERSION}.`));
-        }
-        return {
-            commands: response.commands,
-            events: response.events
+    constructor(link: cxxrtlLink.ILink) {
+        this.connection = new cxxrtlServer.Connection(link);
+        this.connection.onEvent = async (event) => {
+            console.log("event received", event);
         };
     }
 
+    public dispose(): void {
+        this.connection.dispose();
+    }
+
     public async listScopes(): Promise<string[]> {
-        const response = await this.performCommand({
+        const response = await this.connection.listScopes({
             type: 'command',
             command: 'list_scopes'
         });
@@ -294,7 +178,7 @@ export class CXXRTLConnection {
     }
 
     public async listItems(scope: string | null): Promise<Map<string, CXXRTLDebugItem>> {
-        const response = await this.performCommand({
+        const response = await this.connection.listItems({
             type: 'command',
             command: 'list_items',
             scope
@@ -312,20 +196,20 @@ export class CXXRTLConnection {
     }
 
     public async referenceItems(name: string, designations: ICXXRTLDesignation[]): Promise<ICXXRTLReference> {
-        await this.performCommand({
+        await this.connection.referenceItems({
             type: 'command',
             command: 'reference_items',
             reference: name,
-            items: designations
+            items: designations.map((x) => x.toJSON())
         });
         return new CXXRTLReference(name, designations);
     }
 
     public async queryInterval(begin: TimePoint, end: TimePoint, reference: ICXXRTLReference): Promise<CXXRTLSample[]> {
-        const response = await this.performCommand({
+        const response = await this.connection.queryInterval({
             type: 'command',
             command: 'query_interval',
-            interval: new TimeInterval(begin, end),
+            interval: new TimeInterval(begin, end).toJSON(),
             collapse: true,
             items: reference.name,
             item_values_encoding: 'base64(u32)',
@@ -334,7 +218,7 @@ export class CXXRTLConnection {
         const samples = [];
         for (const rawSamples of response.samples) {
             const time = TimePoint.fromJSON(rawSamples.time);
-            const rawValues = Buffer.from(rawSamples.item_values, 'base64');
+            const rawValues = Buffer.from(rawSamples.item_values!, 'base64');
             const valuesArray = new Uint32Array(rawValues.buffer, rawValues.byteOffset, rawValues.length / Uint32Array.BYTES_PER_ELEMENT);
             samples.push(new CXXRTLSample(time, valuesArray, (<CXXRTLReference>reference).designations));
         }
@@ -342,24 +226,25 @@ export class CXXRTLConnection {
     }
 
     public async getSimulationStatus(): Promise<{ status: CXXRTLSimulationStatus, latestTime: TimePoint }> {
-        const response = await this.performCommand({
+        const response = await this.connection.getSimulationStatus({
             type: 'command',
             command: 'get_simulation_status',
         });
-        return { status: response.status, latestTime: TimePoint.fromJSON(response.latest_time) };
+        return { status: response.status as CXXRTLSimulationStatus, latestTime: TimePoint.fromJSON(response.latest_time) };
     }
 
     public async runSimulation({ untilTime, sampleItemValues = true }: { untilTime?: TimePoint, sampleItemValues?: boolean } = {}): Promise<void> {
-        await this.performCommand({
+        await this.connection.runSimulation({
             type: 'command',
             command: 'run_simulation',
             until_time: untilTime?.toJSON() ?? null,
+            until_diagnostics: [],
             sample_item_values: sampleItemValues,
         });
     }
 
     public async pauseSimulation(): Promise<TimePoint> {
-        const response = await this.performCommand({
+        const response = await this.connection.pauseSimulation({
             type: 'command',
             command: 'pause_simulation',
         });

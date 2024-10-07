@@ -1,5 +1,6 @@
 import * as net from 'net';
 import * as vscode from 'vscode';
+import { NodeStreamLink } from './cxxrtl/link';
 import { CXXRTLConnection, CXXRTLDebugItem, CXXRTLDebugItemType, CXXRTLNodeDesignation, CXXRTLSimulationStatus } from './connection';
 import { TimePoint } from './time';
 
@@ -80,7 +81,6 @@ export class CXXRTLDebugger {
     public dispose() {
         this._onDidChangeCurrentTime.dispose();
         this._onDidChangeSimulationStatus.dispose();
-        this._onDidChangeCurrentTime.dispose();
     }
 
     public async startSession(): Promise<void> {
@@ -108,15 +108,7 @@ export class CXXRTLDebugger {
                     vscode.window.showInformationMessage("Connected to the CXXRTL server.");
 
                     (async () => {
-                        this.connection = new CXXRTLConnection(socket,
-                            (serverError) => {
-                                vscode.window.showErrorMessage(`The CXXRTL server has returned an error: ${serverError.message}`);
-                            },
-                            (clientError) => {
-                                vscode.window.showErrorMessage(`The RTL debugger has encountered an error: ${clientError.message}`);
-                            });
-
-                        const _capabilities = await this.connection.exchangeGreeting();
+                        this.connection = new CXXRTLConnection(new NodeStreamLink(socket));
                         this._scopes = await this.connection.listScopes();
                         this.setSessionStatus(CXXRTLSessionStatus.Running);
                         this.updateSimulationStatus();
