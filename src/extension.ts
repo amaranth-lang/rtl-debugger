@@ -1,13 +1,11 @@
 import * as vscode from 'vscode';
 import { CXXRTLDebugger } from './debugger';
-import { CXXRTLHierarchyTreeDataProvider } from './hierarchyTree';
-import { CXXRTLVariableTreeDataProvider } from './variableTree';
 import { CXXRTLSimulationStatus } from './connection';
+import * as sidebar from './ui/sidebar';
 
 export function activate(context: vscode.ExtensionContext) {
     const rtlDebugger = new CXXRTLDebugger();
-    const cxxrtlHierarchyTreeDataProvider = new CXXRTLHierarchyTreeDataProvider(rtlDebugger);
-    const cxxrtlVariableTreeDataProvider = new CXXRTLVariableTreeDataProvider(rtlDebugger);
+    const sidebarTreeDataProvider = new sidebar.TreeDataProvider(rtlDebugger);
 
     vscode.commands.executeCommand('setContext', 'rtlDebugger.sessionStatus', rtlDebugger.sessionStatus);
     context.subscriptions.push(rtlDebugger.onDidChangeSessionStatus((state) =>
@@ -42,25 +40,14 @@ export function activate(context: vscode.ExtensionContext) {
     context.subscriptions.push(vscode.commands.registerCommand('rtlDebugger.stepForward', () =>
         rtlDebugger.stepForward()));
 
-    const cxxrtlHierarchyTreeView = vscode.window.createTreeView('rtlDebugger.hierarchy', {
-        treeDataProvider: cxxrtlHierarchyTreeDataProvider,
-        showCollapseAll: true
-    });
-    context.subscriptions.push(cxxrtlHierarchyTreeView);
+    // For an unknown reason, the `vscode.open` command (which does the exact same thing) ignores the options.
+    context.subscriptions.push(vscode.commands.registerCommand('rtlDebugger.openDocument',
+        (uri: vscode.Uri, options: vscode.TextDocumentShowOptions) => {
+            vscode.window.showTextDocument(uri, options);
+        }));
 
-    const cxxrtlVariableTreeView = vscode.window.createTreeView('rtlDebugger.variables', {
-        treeDataProvider: cxxrtlVariableTreeDataProvider,
-        canSelectMany: true
+    const cxxrtlSidebarTreeView = vscode.window.createTreeView('rtlDebugger.sidebar', {
+        treeDataProvider: sidebarTreeDataProvider
     });
-    context.subscriptions.push(cxxrtlVariableTreeView);
-
-    context.subscriptions.push(cxxrtlHierarchyTreeView.onDidChangeSelection((event) => {
-        if (event.selection.length !== 0) {
-            cxxrtlVariableTreeDataProvider.scope = event.selection[0].id;
-        } else {
-            cxxrtlVariableTreeDataProvider.scope = '';
-        }
-        // UPSTREAM: It's not currently possible to un-select elements in a contributed tree. See microsoft/vscode#48754.
-        // cxxrtlVariableTreeView.unSelect();
-    }));
+    context.subscriptions.push(cxxrtlSidebarTreeView);
 }

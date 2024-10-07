@@ -1,43 +1,6 @@
 import * as cxxrtlLink from './cxxrtl/link';
-import * as cxxrtlServer from './cxxrtl/server';
-import { TimeInterval, TimePoint } from './time';
-
-export interface ICXXRTLAgentError {
-    name: string;
-    message: string;
-}
-
-export interface ICXXRTLSourceLocation {
-    file: string;
-    startLine: number;
-    startColumn?: number;
-    endLine?: number;
-    endColumn?: number;
-}
-
-class YosysSourceLocation implements ICXXRTLSourceLocation {
-    constructor(
-        public file: string,
-        public startLine: number,
-        public startColumn?: number,
-        public endLine?: number,
-        public endColumn?: number,
-    ) {}
-
-    public static parse(src: string): YosysSourceLocation | null {
-        const matches = src.match(/^(.+?):(\d+)(?:\.(\d+)(?:-(\d+)\.(\d+)))?$/);
-        if (!matches) {
-            return null;
-        }
-        return new YosysSourceLocation(
-            matches[1],
-            parseInt(matches[2]),
-            matches.length >= 4 ? parseInt(matches[3]) : undefined,
-            matches.length >= 4 ? parseInt(matches[4]) : undefined,
-            matches.length >= 6 ? parseInt(matches[5]) : undefined,
-        );
-    }
-}
+import * as cxxrtlClient from './cxxrtl/client';
+import { TimeInterval, TimePoint } from './model/time';
 
 export enum CXXRTLDebugItemType {
     Node = "node",
@@ -45,8 +8,6 @@ export enum CXXRTLDebugItemType {
 }
 
 export class CXXRTLDebugItem {
-    sourceLocations: ICXXRTLSourceLocation[] = [];
-
     constructor(
         public readonly name: string,
         public readonly type: CXXRTLDebugItemType,
@@ -156,10 +117,10 @@ export class CXXRTLSample {
 }
 
 export class CXXRTLConnection {
-    private connection: cxxrtlServer.Connection;
+    public connection: cxxrtlClient.Connection;
 
     constructor(link: cxxrtlLink.ILink) {
-        this.connection = new cxxrtlServer.Connection(link);
+        this.connection = new cxxrtlClient.Connection(link);
         this.connection.onEvent = async (event) => {
             console.log("event received", event);
         };
@@ -169,31 +130,7 @@ export class CXXRTLConnection {
         this.connection.dispose();
     }
 
-    public async listScopes(): Promise<string[]> {
-        const response = await this.connection.listScopes({
-            type: 'command',
-            command: 'list_scopes'
-        });
-        return Object.keys(response.scopes);
-    }
-
-    public async listItems(scope: string | null): Promise<Map<string, CXXRTLDebugItem>> {
-        const response = await this.connection.listItems({
-            type: 'command',
-            command: 'list_items',
-            scope
-        });
-        return new Map(Object.entries(response.items).map(([name, itemDesc]: [string, any]) => {
-            const debugItem = new CXXRTLDebugItem(name, itemDesc.type, itemDesc.width, itemDesc.lsb_at, itemDesc.depth, itemDesc.zero_at);
-            for (const rawSrc of (<{src: string}>itemDesc).src?.split('|') ?? []) {
-                const sourceLocation = YosysSourceLocation.parse(rawSrc);
-                if (sourceLocation !== null) {
-                    debugItem.sourceLocations.push(sourceLocation);
-                }
-            }
-            return [name, debugItem];
-        }));
-    }
+    // Everything below is deprecated
 
     public async referenceItems(name: string, designations: ICXXRTLDesignation[]): Promise<ICXXRTLReference> {
         await this.connection.referenceItems({

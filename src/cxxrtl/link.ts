@@ -1,18 +1,18 @@
 import * as stream from 'node:stream';
-import * as wire from './proto';
+import * as proto from './proto';
 
 export interface ILink {
     dispose(): void;
 
-    onRecv: (packet: wire.ServerPacket) => Promise<void>;
+    onRecv: (packet: proto.ServerPacket) => Promise<void>;
     onDone: () => Promise<void>;
 
-    send(packet: wire.ClientPacket): Promise<void>;
+    send(packet: proto.ClientPacket): Promise<void>;
 };
 
 export class MockLink implements ILink {
     constructor(
-        private conversation: [wire.ClientPacket, wire.ServerPacket | wire.ServerPacket[]][]
+        private conversation: [proto.ClientPacket, proto.ServerPacket | proto.ServerPacket[]][]
     ) {}
 
     public dispose(): void {
@@ -21,11 +21,11 @@ export class MockLink implements ILink {
         }
     }
 
-    public async onRecv(_serverPacket: wire.ServerPacket): Promise<void> {}
+    public async onRecv(_serverPacket: proto.ServerPacket): Promise<void> {}
 
     public async onDone(): Promise<void> {}
 
-    public async send(clientPacket: wire.ClientPacket): Promise<void> {
+    public async send(clientPacket: proto.ClientPacket): Promise<void> {
         if (this.conversation.length === 0) {
             throw new Error('premature end of conversation');
         }
@@ -84,7 +84,7 @@ export class NodeStreamLink implements ILink {
         this.stream.pause();
         for (const packetText of packetTexts) {
             try {
-                const packet = JSON.parse(packetText) as wire.ServerPacket;
+                const packet = JSON.parse(packetText) as proto.ServerPacket;
                 try {
                     await this.onRecv(packet);
                     this.stream.resume();
@@ -112,11 +112,11 @@ export class NodeStreamLink implements ILink {
         this.stream.destroy();
     }
 
-    public async onRecv(_serverPacket: wire.ServerPacket): Promise<void> {}
+    public async onRecv(_serverPacket: proto.ServerPacket): Promise<void> {}
 
     public async onDone(): Promise<void> {}
 
-    public async send(clientPacket: wire.ClientPacket): Promise<void> {
+    public async send(clientPacket: proto.ClientPacket): Promise<void> {
         this.stream.write(JSON.stringify(clientPacket) + '\0');
     }
 }

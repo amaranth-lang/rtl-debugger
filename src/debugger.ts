@@ -2,7 +2,9 @@ import * as net from 'net';
 import * as vscode from 'vscode';
 import { NodeStreamLink } from './cxxrtl/link';
 import { CXXRTLConnection, CXXRTLDebugItem, CXXRTLDebugItemType, CXXRTLNodeDesignation, CXXRTLSimulationStatus } from './connection';
-import { TimePoint } from './time';
+import { TimePoint } from './model/time';
+import { Scope } from './model/scope';
+import { Variable } from './model/variable';
 
 export enum CXXRTLSessionStatus {
     Absent = "absent",
@@ -26,9 +28,6 @@ export class CXXRTLDebugger {
     public get currentTime() { return this._currentTime;}
     private _onDidChangeCurrentTime: vscode.EventEmitter<TimePoint> = new vscode.EventEmitter<TimePoint>();
     readonly onDidChangeCurrentTime: vscode.Event<TimePoint> = this._onDidChangeCurrentTime.event;
-
-    private _scopes: string[] = [];
-    public get scopes() { return this._scopes; }
 
     // Simulation properties.
 
@@ -109,7 +108,6 @@ export class CXXRTLDebugger {
 
                     (async () => {
                         this.connection = new CXXRTLConnection(new NodeStreamLink(socket));
-                        this._scopes = await this.connection.listScopes();
                         this.setSessionStatus(CXXRTLSessionStatus.Running);
                         this.updateSimulationStatus();
                         console.log("[RTL Debugger] Initialized");
@@ -150,7 +148,6 @@ export class CXXRTLDebugger {
 
         this.setSessionStatus(CXXRTLSessionStatus.Absent);
         this._currentTime = TimePoint.ZERO;
-        this._scopes = [];
 
         this.setSimulationStatus(CXXRTLSimulationStatus.Finished, TimePoint.ZERO);
     }
@@ -202,13 +199,6 @@ export class CXXRTLDebugger {
         this.setSimulationStatus(CXXRTLSimulationStatus.Paused, latestTime);
     }
 
-    public async listVariables(scope: string): Promise<Map<string, CXXRTLDebugItem>> {
-        if (!this.connection) {
-            return new Map();
-        }
-        return await this.connection.listItems(scope);
-    }
-
     public async getVariableValues(variables: CXXRTLDebugItem[]): Promise<Map<string, bigint>> {
         if (!this.connection) {
             return new Map();
@@ -258,5 +248,48 @@ export class CXXRTLDebugger {
             clearTimeout(this.simulationStatusUpdateTimeout);
             this.simulationStatusUpdateTimeout = null;
         }
+    }
+
+    // new API
+
+    private async getVariablesForScope(cxxrtlScopeName: string): Promise<Variable[]> {
+        const cxxrtlResponse = await this.connection!.connection.listItems({
+            type: 'command',
+            command: 'list_items',
+            scope: cxxrtlScopeName,
+        });
+        return Object.entries(cxxrtlResponse.items).map(([cxxrtlName, cxxrtlDesc]) =>
+            Variable.fromCXXRTL(cxxrtlName, cxxrtlDesc));
+    }
+
+    public async getRootScope(): Promise<Scope> {
+        const cxxrtlResponse = await this.connection!.connection.listScopes({
+            type: 'command',
+            command: 'list_scopes',
+        });
+        let rootScope: Scope | undefined;
+        const scopeStack: Scope[][] = [];
+        for (const [cxxrtlName, cxxrtlDesc] of Object.entries(cxxrtlResponse.scopes)) {
+            const nestedScopes: Scope[] = [];
+            const nestedVariables: Thenable<Variable[]> = {
+                // NormallyPromises are evaluated eagerly; this Thenable does it lazily.
+                then: (onfulfilled, onrejected) => {
+                    return this.getVariablesForScope(cxxrtlName).then(onfulfilled, onrejected);
+                }
+            };
+            const scope = Scope.fromCXXRTL(cxxrtlName, cxxrtlDesc, nestedScopes, nestedVariables);
+            const scopeName = cxxrtlName === '' ? [] : cxxrtlName.split(' ');
+            while (1 + scopeName.length <= scopeStack.length) {
+                scopeStack.pop();
+            }
+            if (scopeStack.length > 0) {
+                scopeStack.at(-1)!.push(scope);
+            }
+            scopeStack.push(nestedScopes);
+            if (cxxrtlName === '') {
+                rootScope = scope;
+            }
+        }
+        return rootScope!;
     }
 }

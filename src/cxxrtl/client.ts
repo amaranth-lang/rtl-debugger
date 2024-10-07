@@ -87,9 +87,16 @@ export class Connection {
     }
 
     private rejectPromises(error: Error): void {
-        for (const commandPromise of this.promises.splice(0, this.promises.length)) {
-            commandPromise.reject(error);
+        for (const promise of this.promises.splice(0, this.promises.length)) {
+            promise.reject(error);
         }
+    }
+
+    private async perform(command: proto.AnyCommand): Promise<proto.AnyResponse> {
+        await this.send(command);
+        return new Promise((resolve, reject) => {
+            this.promises.push({ resolve, reject });
+        });
     }
 
     public async onConnected(): Promise<void> {}
@@ -112,13 +119,6 @@ export class Connection {
 
     public get itemValuesEncodings(): string[] {
         return this._itemValuesEncodings.slice();
-    }
-
-    private async perform(command: proto.AnyCommand): Promise<proto.AnyResponse> {
-        await this.send(command);
-        return new Promise((resolve, reject) => {
-            this.promises.push({ resolve, reject });
-        });
     }
 
     public async listScopes(command: proto.CommandListScopes): Promise<proto.ResponseListScopes> {

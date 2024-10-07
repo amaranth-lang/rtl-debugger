@@ -49,17 +49,20 @@
       {
         "command": "rtlDebugger.startSession",
         "category": "RTL Debugger",
-        "title": "Start Session"
+        "title": "Start Session",
+        "icon": "$(debug-start)"
       },
       {
         "command": "rtlDebugger.stopSession",
         "category": "RTL Debugger",
-        "title": "Stop Session"
+        "title": "Stop Session",
+        "icon": "$(debug-stop)"
       },
       {
         "command": "rtlDebugger.runSimulation",
         "category": "RTL Debugger",
-        "title": "Run Simulation"
+        "title": "Run Simulation",
+        "icon": "$(debug-continue)"
       },
       {
         "command": "rtlDebugger.runSimulationUntil",
@@ -69,17 +72,20 @@
       {
         "command": "rtlDebugger.pauseSimulation",
         "category": "RTL Debugger",
-        "title": "Pause Simulation"
+        "title": "Pause Simulation",
+        "icon": "$(debug-pause)"
       },
       {
         "command": "rtlDebugger.stepForward",
         "category": "RTL Debugger",
-        "title": "Step Forward"
+        "title": "Step Forward",
+        "icon": "$(debug-step-over)"
       },
       {
         "command": "rtlDebugger.stepBackward",
         "category": "RTL Debugger",
-        "title": "Step Backward"
+        "title": "Step Backward",
+        "icon": "$(debug-step-back)"
       }
     ],
     "viewsContainers": {
@@ -94,34 +100,21 @@
     "views": {
       "rtlDebugger": [
         {
-          "id": "rtlDebugger.hierarchy",
-          "name": "Hierarchy"
-        },
-        {
-          "id": "rtlDebugger.variables",
-          "name": "Variables"
+          "id": "rtlDebugger.sidebar",
+          "name": "Session"
         }
       ]
     },
     "viewsWelcome": [
       {
-        "view": "rtlDebugger.hierarchy",
+        "view": "rtlDebugger.sidebar",
         "contents": "The debug session is not running.\n[Start Session](command:rtlDebugger.startSession)",
         "when": "rtlDebugger.sessionStatus == absent"
       },
       {
-        "view": "rtlDebugger.hierarchy",
+        "view": "rtlDebugger.sidebar",
         "contents": "The debug session is initializing...",
         "when": "rtlDebugger.sessionStatus == starting"
-      },
-      {
-        "view": "rtlDebugger.hierarchy",
-        "contents": "There are no scopes in the simulation.",
-        "when": "rtlDebugger.sessionStatus == running"
-      },
-      {
-        "view": "rtlDebugger.variables",
-        "contents": "The selected scope is empty."
       }
     ],
     "menus": {
@@ -153,6 +146,38 @@
         {
           "command": "rtlDebugger.stepBackward",
           "when": "rtlDebugger.sessionStatus == running"
+        }
+      ],
+      "view/title": [
+        {
+          "command": "rtlDebugger.stepBackward",
+          "when": "view == rtlDebugger.sidebar && rtlDebugger.sessionStatus == running",
+          "group": "navigation@1"
+        },
+        {
+          "command": "rtlDebugger.stepForward",
+          "when": "view == rtlDebugger.sidebar && rtlDebugger.sessionStatus == running",
+          "group": "navigation@2"
+        },
+        {
+          "command": "rtlDebugger.runSimulation",
+          "when": "view == rtlDebugger.sidebar && rtlDebugger.sessionStatus == running && rtlDebugger.simulationStatus == paused",
+          "group": "navigation@3"
+        },
+        {
+          "command": "rtlDebugger.pauseSimulation",
+          "when": "view == rtlDebugger.sidebar && rtlDebugger.sessionStatus == running && rtlDebugger.simulationStatus == running",
+          "group": "navigation@3"
+        },
+        {
+          "command": "rtlDebugger.startSession",
+          "when": "view == rtlDebugger.sidebar && rtlDebugger.sessionStatus == absent",
+          "group": "navigation@4"
+        },
+        {
+          "command": "rtlDebugger.stopSession",
+          "when": "view == rtlDebugger.sidebar && rtlDebugger.sessionStatus == running",
+          "group": "navigation@5"
         }
       ]
     }
