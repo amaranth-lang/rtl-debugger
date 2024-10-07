@@ -75,7 +75,7 @@ export class NodeStreamLink implements ILink {
                     packetTexts.push(packetText);
                 }
             });
-            this.recvBuffer.splice(0, this.recvBuffer.length, rest[-1]);
+            this.recvBuffer.splice(0, this.recvBuffer.length, rest.at(-1)!);
         }
 
         // Second, process the packets. This involves steps that may throw errors, so we catch
@@ -87,11 +87,14 @@ export class NodeStreamLink implements ILink {
                 const packet = JSON.parse(packetText) as wire.ServerPacket;
                 try {
                     await this.onRecv(packet);
+                    this.stream.resume();
                 } catch (error) {
                     console.error('uncaught error in onRecv', error);
+                    return; // leave paused
                 }
             } catch (error) {
-                console.error('malformed JSON', packetText);
+                console.error('malformed JSON: ', packetText);
+                return; // leave paused
             }
         }
         this.stream.resume();
