@@ -1,15 +1,19 @@
 {
+  "publisher": "amaranth-lang",
   "name": "rtl-debugger",
   "displayName": "RTL Debugger",
   "description": "Debugger for HDLs supported by the open-source toolchain: Amaranth, Verilog, VHDL, ...",
   "version": "0.0.0",
-  "engines": {
-    "vscode": "^1.84.0"
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/amaranth-lang/rtl-debugger"
   },
   "categories": [
     "Debuggers"
   ],
-  "activationEvents": [],
+  "engines": {
+    "vscode": "^1.94.0"
+  },
   "main": "./out/extension.js",
   "contributes": {
     "configuration": {
@@ -19,7 +23,9 @@
       "$comment": "UPSTREAM: Unfortunately there is no way to control the formatting of the extension name within the setting title. See microsoft/vscode#103592",
       "properties": {
         "rtlDebugger.command": {
-          "type": ["array"],
+          "type": [
+            "array"
+          ],
           "items": {
             "type": "string"
           },
@@ -39,7 +45,11 @@
           "description": "Specifies the port that the CXXRTL agent within the debug session is listening at."
         },
         "rtlDebugger.displayStyle": {
-          "enum": ["Verilog", "VHDL", "Python"],
+          "enum": [
+            "Verilog",
+            "VHDL",
+            "Python"
+          ],
           "default": "Verilog",
           "markdownDescription": "Specifies the display format for variables."
         }
@@ -183,22 +193,22 @@
     }
   },
   "scripts": {
-    "compile": "tsc -p ./",
-    "watch": "tsc -watch -p ./",
-    "lint": "eslint src --ext ts",
-    "pretest": "npm run compile && npm run lint",
-    "test": "vscode-test",
-    "vscode:prepublish": "npm run compile"
+    "lint": "eslint --fix",
+    "tsc": "tsc --project tsconfig.json",
+    "tsc:watch": "npm run tsc -- --watch",
+    "esbuild": "esbuild ./src/extension.ts --bundle --sourcemap --outdir=out/ --format=cjs --platform=node --external:vscode",
+    "esbuild:watch": "npm run esbuild -- --watch",
+    "vscode:prepublish": "npm run lint && npm run tsc && npm run esbuild",
+    "package": "vsce package"
   },
   "devDependencies": {
-    "@types/vscode": "^1.84.0",
-    "@types/mocha": "^10.0.6",
-    "@types/node": "18.x",
-    "@typescript-eslint/eslint-plugin": "^6.13.1",
-    "@typescript-eslint/parser": "^6.13.1",
-    "eslint": "^8.54.0",
-    "typescript": "^5.3.2",
-    "@vscode/test-cli": "^0.0.4",
-    "@vscode/test-electron": "^2.3.8"
+    "@types/node": "20.x",
+    "@types/vscode": "^1.94",
+    "@typescript-eslint/eslint-plugin": "^8",
+    "@typescript-eslint/parser": "^8",
+    "esbuild": "^0.24",
+    "eslint": "^9.12",
+    "typescript": "5.5.x",
+    "@vscode/vsce": "^3.x"
   }
 }
