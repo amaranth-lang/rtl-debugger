@@ -1,4 +1,5 @@
 import * as stream from 'node:stream';
+
 import * as proto from './proto';
 
 export interface ILink {

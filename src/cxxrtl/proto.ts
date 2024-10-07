@@ -171,7 +171,7 @@ export type CommandReferenceItems = {
 
 export type ResponseReferenceItems = {
     type: 'response';
-    response: 'reference_items';
+    command: 'reference_items';
 };
 
 // ## Command: Query Interval

@@ -26,6 +26,10 @@ export class Connection {
         resolve: (response: proto.AnyResponse) => void;
         reject: (error: Error) => void;
     }[] = [];
+    private timestamps: Date[] = [];
+
+    private sendIndex: number = 0;
+    private recvIndex: number = 0;
 
     constructor(private readonly link: link.ILink) {
         this.link.onRecv = this.onLinkRecv.bind(this);
@@ -40,8 +44,31 @@ export class Connection {
         this.link.dispose();
     }
 
+    private traceSend(packet: proto.ClientPacket) {
+        this.timestamps.push(new Date());
+        if (packet.type === 'greeting') {
+            console.debug(`C>S`, packet);
+        } else if (packet.type === 'command') {
+            console.debug(`C>S#${this.sendIndex++}`, packet);
+        }
+    }
+
+    private traceRecv(packet: proto.ServerPacket) {
+        if (packet.type === 'greeting') {
+            console.debug(`S>C`, packet);
+        } else if (packet.type === 'response') {
+            const elapsed = new Date().getTime() - this.timestamps.shift()!.getTime();
+            console.debug(`S>C#${this.recvIndex++}`, packet, `(${elapsed}ms)`);
+        } else if (packet.type === 'error') {
+            this.timestamps.shift();
+            console.error(`S>C#${this.recvIndex++}`, packet);
+        } else if (packet.type === 'event') {
+            console.debug(`S>C`, packet);
+        }
+    }
+
     private async send(packet: proto.ClientPacket): Promise<void> {
-        console.log('[RTL Debugger] C>S:', packet);
+        this.traceSend(packet);
         if (this._state === ConnectionState.Disconnected) {
             throw new Error('unable to send packet after link is shutdown');
         } else {
@@ -50,7 +77,7 @@ export class Connection {
     }
 
     private async onLinkRecv(packet: proto.ServerPacket): Promise<void> {
-        console.log('[RTL Debugger] S>C:', packet);
+        this.traceRecv(packet);
         if (this._state === ConnectionState.Initializing && packet.type === 'greeting') {
             if (packet.version === 0) {
                 this._commands = packet.commands;
