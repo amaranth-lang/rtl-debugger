@@ -91,9 +91,11 @@ export class CXXRTLDebugger {
         const configuration = vscode.workspace.getConfiguration('rtlDebugger');
         if (configuration.command.length !== 0) {
             this.terminal = vscode.window.createTerminal({
-                name: "CXXRTL Simulation",
+                name: 'Simulation Process',
                 shellPath: configuration.command[0],
                 shellArgs: configuration.command.slice(1),
+                cwd: configuration.cwd,
+                env: configuration.env,
                 isTransient: true,
                 iconPath: new vscode.ThemeIcon('debug-console')
             });

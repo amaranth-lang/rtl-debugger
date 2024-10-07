@@ -37,6 +37,14 @@
           "default": "${workspaceFolder}",
           "description": "Specifies the working directory for the launch command."
         },
+        "rtlDebugger.env": {
+          "type": "object",
+          "patternProperties": {
+            "": "string"
+          },
+          "default": {},
+          "description": "Specifies the environment for the launch command."
+        },
         "rtlDebugger.port": {
           "type": "integer",
           "minimum": 1,
