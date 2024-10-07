@@ -5,6 +5,7 @@ import { CXXRTLConnection, CXXRTLDebugItem, CXXRTLDebugItemType, CXXRTLNodeDesig
 import { TimePoint } from './model/time';
 import { Scope } from './model/scope';
 import { Variable } from './model/variable';
+import { StatusItemController } from './ui/status';
 
 export enum CXXRTLSessionStatus {
     Absent = "absent",
@@ -13,7 +14,7 @@ export enum CXXRTLSessionStatus {
 }
 
 export class CXXRTLDebugger {
-    private statusItem: vscode.StatusBarItem;
+    private statusItemController: StatusItemController;
     private terminal: vscode.Terminal | null = null;
     private connection: CXXRTLConnection | null = null;
 
@@ -44,37 +45,7 @@ export class CXXRTLDebugger {
     readonly onDidChangeLatestTime: vscode.Event<TimePoint> = this._onDidChangeLatestTime.event;
 
     constructor() {
-        this.statusItem = vscode.window.createStatusBarItem('rtlDebugger', vscode.StatusBarAlignment.Left, 10);
-        this.statusItem.tooltip = 'RTL Debugger Status';
-        this.statusItem.command = 'rtlDebugger.runPauseSimulation';
-        this.onDidChangeSessionStatus((_state) => this.updateStatusItem());
-        this.onDidChangeCurrentTime((_time) => this.updateStatusItem());
-        this.onDidChangeSimulationStatus((_state) => this.updateStatusItem());
-        this.onDidChangeLatestTime((_time) => this.updateStatusItem());
-    }
-
-    private updateStatusItem() {
-        if (this.sessionStatus === CXXRTLSessionStatus.Absent) {
-            this.statusItem.hide();
-        } else {
-            this.statusItem.show();
-            if (this.sessionStatus === CXXRTLSessionStatus.Starting) {
-                this.statusItem.text = `$(gear~spin) Starting...`;
-                this.statusItem.tooltip = `RTL Debugger: Starting`;
-            } else { // this.sessionState === CXXRTLSessionState.Running
-                if (this.simulationStatus === CXXRTLSimulationStatus.Running) {
-                    this.statusItem.text = '$(debug-pause) ';
-                    this.statusItem.tooltip = `RTL Debugger: Running`;
-                } else if (this.simulationStatus === CXXRTLSimulationStatus.Paused) {
-                    this.statusItem.text = '$(debug-continue) ';
-                    this.statusItem.tooltip = `RTL Debugger: Paused`;
-                } else if (this.simulationStatus === CXXRTLSimulationStatus.Finished) {
-                    this.statusItem.text = '';
-                    this.statusItem.tooltip = `RTL Debugger: Finished`;
-                }
-                this.statusItem.text += `${this.currentTime} / ${this.latestTime}`;
-            }
-        }
+        this.statusItemController = new StatusItemController(this);
     }
 
     public dispose() {

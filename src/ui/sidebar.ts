@@ -192,16 +192,16 @@ export class TreeDataProvider implements vscode.TreeDataProvider<TreeItem> {
     constructor(
         readonly rtlDebugger: CXXRTLDebugger
     ) {
+        vscode.workspace.onDidChangeConfiguration((event) => {
+            if (event.affectsConfiguration('rtlDebugger.displayStyle')) {
+                this._onDidChangeTreeData.fire(null);
+            }
+        });
         rtlDebugger.onDidChangeSessionStatus((_state) => {
             this._onDidChangeTreeData.fire(null);
         });
         rtlDebugger.onDidChangeCurrentTime((_time) => {
             this._onDidChangeTreeData.fire(null);
-        });
-        vscode.workspace.onDidChangeConfiguration((event) => {
-            if (event.affectsConfiguration('rtlDebugger.displayStyle')) {
-                this._onDidChangeTreeData.fire(null);
-            }
         });
     }
 
