@@ -1,15 +1,17 @@
 import * as vscode from 'vscode';
+import { watchList } from './debug/watch';
 import { CXXRTLDebugger } from './debugger';
 import * as sidebar from './ui/sidebar';
 import { inputTime } from './ui/input';
 
 export function activate(context: vscode.ExtensionContext) {
     const rtlDebugger = new CXXRTLDebugger();
-    const sidebarTreeDataProvider = new sidebar.TreeDataProvider(rtlDebugger);
 
-    context.subscriptions.push(vscode.window.createTreeView('rtlDebugger.sidebar', {
+    const sidebarTreeDataProvider = new sidebar.TreeDataProvider(rtlDebugger);
+    const sidebarTreeView = vscode.window.createTreeView('rtlDebugger.sidebar', {
         treeDataProvider: sidebarTreeDataProvider
-    }));
+    });
+    context.subscriptions.push(sidebarTreeView);
 
     vscode.commands.executeCommand('setContext', 'rtlDebugger.sessionStatus', rtlDebugger.sessionStatus);
     context.subscriptions.push(rtlDebugger.onDidChangeSessionStatus((state) =>
@@ -47,6 +49,11 @@ export function activate(context: vscode.ExtensionContext) {
         rtlDebugger.session!.stepBackward()));
     context.subscriptions.push(vscode.commands.registerCommand('rtlDebugger.stepForward', () =>
         rtlDebugger.session!.stepForward()));
+
+    context.subscriptions.push(vscode.commands.registerCommand('rtlDebugger.watchVariable', (treeItem) =>
+        watchList.append(treeItem.getWatchItem())));
+    context.subscriptions.push(vscode.commands.registerCommand('rtlDebugger.unWatchVariable', (treeItem) =>
+        watchList.remove(treeItem.metadata.index)));
 
     // For an unknown reason, the `vscode.open` command (which does the exact same thing) ignores the options.
     context.subscriptions.push(vscode.commands.registerCommand('rtlDebugger.openDocument',

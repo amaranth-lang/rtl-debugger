@@ -116,6 +116,17 @@ export class Session {
         );
     }
 
+    async getVariable(variableIdentifier: string): Promise<Variable | null> {
+        const identifierParts = variableIdentifier.split(' ');
+        const scopeIdentifier = identifierParts.slice(0, identifierParts.length - 1).join(' ');
+        const items = await this.listItemsInScope(scopeIdentifier);
+        if (variableIdentifier in items) {
+            return Variable.fromCXXRTL(variableIdentifier, items[variableIdentifier]);
+        } else {
+            return null;
+        }
+    }
+
     // ======================================== Querying the database
 
     private referenceEpochs: Map<string, number> = new Map();

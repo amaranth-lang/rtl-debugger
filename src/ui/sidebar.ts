@@ -6,9 +6,13 @@ import { DisplayStyle, variableDescription, variableBitIndices, memoryRowIndices
 import { CXXRTLDebugger } from '../debugger';
 import { Observer } from '../debug/observer';
 import { Designation, MemoryRangeDesignation, MemoryRowDesignation, ScalarDesignation } from '../model/sample';
+import { IWatchItem, watchList } from '../debug/watch';
 import { Session } from '../debug/session';
 
 abstract class TreeItem {
+    // Currently used only for removing watch items, where knowing the index is necessary.
+    metadata: any;
+
     constructor(
         readonly provider: TreeDataProvider
     ) {}
@@ -33,6 +37,7 @@ class BitTreeItem extends TreeItem {
         provider: TreeDataProvider,
         readonly designation: ScalarDesignation | MemoryRowDesignation,
         readonly bitIndex: number,
+        readonly contextValue?: string,
     ) {
         super(provider);
     }
@@ -58,7 +63,17 @@ class BitTreeItem extends TreeItem {
                 : '= 0';
         }
         treeItem.tooltip = variableTooltip(variable);
+        treeItem.contextValue = this.contextValue;
         return treeItem;
+    }
+
+    getWatchItem(): IWatchItem {
+        return {
+            id: this.designation.variable.cxxrtlIdentifier,
+            row: (this.designation instanceof MemoryRowDesignation)
+                ? this.designation.index : undefined,
+            bit: this.bitIndex,
+        };
     }
 }
 
@@ -66,6 +81,7 @@ class ScalarTreeItem extends TreeItem {
     constructor(
         provider: TreeDataProvider,
         readonly designation: ScalarDesignation | MemoryRowDesignation,
+        readonly contextValue?: string,
     ) {
         super(provider);
     }
@@ -88,13 +104,22 @@ class ScalarTreeItem extends TreeItem {
         treeItem.description += variableValue(this.displayStyle, variable, value);
         treeItem.tooltip = variableTooltip(variable);
         treeItem.command = variable.location?.asOpenCommand();
+        treeItem.contextValue = this.contextValue;
         return treeItem;
     }
 
     override getChildren(): TreeItem[] {
         const variable = this.designation.variable;
         return Array.from(variableBitIndices(this.displayStyle, variable)).map((index) =>
-            new BitTreeItem(this.provider, this.designation, index));
+            new BitTreeItem(this.provider, this.designation, index, 'canWatch'));
+    }
+
+    getWatchItem(): IWatchItem {
+        return {
+            id: this.designation.variable.cxxrtlIdentifier,
+            row: (this.designation instanceof MemoryRowDesignation)
+                ? this.designation.index : undefined,
+        };
     }
 }
 
@@ -102,6 +127,7 @@ class ArrayTreeItem extends TreeItem {
     constructor(
         provider: TreeDataProvider,
         readonly designation: MemoryRangeDesignation,
+        readonly contextValue?: string,
     ) {
         super(provider);
     }
@@ -114,13 +140,20 @@ class ArrayTreeItem extends TreeItem {
         treeItem.description = variableDescription(this.displayStyle, variable);
         treeItem.tooltip = variableTooltip(variable);
         treeItem.command = variable.location?.asOpenCommand();
+        treeItem.contextValue = this.contextValue;
         return treeItem;
     }
 
     override getChildren(): TreeItem[] {
         const variable = this.designation.variable;
         return Array.from(memoryRowIndices(variable)).map((index) =>
-            new ScalarTreeItem(this.provider, variable.designation(index)));
+            new ScalarTreeItem(this.provider, variable.designation(index), 'canWatch'));
+    }
+
+    getWatchItem(): IWatchItem {
+        return {
+            id: this.designation.variable.cxxrtlIdentifier
+        };
     }
 }
 
@@ -164,10 +197,61 @@ class ScopeTreeItem extends TreeItem {
         }
         for (const variable of await this.scope.variables) {
             if (variable instanceof ScalarVariable) {
-                children.push(new ScalarTreeItem(this.provider, variable.designation()));
+                children.push(new ScalarTreeItem(this.provider, variable.designation(), 'canWatch'));
             }
             if (variable instanceof MemoryVariable) {
-                children.push(new ArrayTreeItem(this.provider, variable.designation()));
+                children.push(new ArrayTreeItem(this.provider, variable.designation(), 'canWatch'));
+            }
+        }
+        return children;
+    }
+}
+
+class WatchTreeItem extends TreeItem {
+    constructor(
+        provider: TreeDataProvider
+    ) {
+        super(provider);
+    }
+
+    override async getTreeItem(): Promise<vscode.TreeItem> {
+        if (watchList.get().length > 0) {
+            return new vscode.TreeItem('Watch', vscode.TreeItemCollapsibleState.Expanded);
+        } else {
+            return new vscode.TreeItem('Watch (empty)');
+        }
+    }
+
+    override async getChildren(): Promise<TreeItem[]> {
+        const children = [];
+        for (const [index, watchItem] of watchList.get().entries()) {
+            const variable = await this.provider.getVariable(watchItem.id);
+            if (variable === null) {
+                continue;
+            }
+            let designation;
+            if (variable instanceof ScalarVariable) {
+                designation = variable.designation();
+            } else if (variable instanceof MemoryVariable) {
+                if (watchItem.row === undefined) {
+                    designation = variable.designation();
+                } else {
+                    designation = variable.designation(watchItem.row);
+                }
+            }
+            let treeItem;
+            if (designation instanceof MemoryRangeDesignation) {
+                treeItem = new ArrayTreeItem(this.provider, designation, 'inWatchList');
+            } else if (designation instanceof ScalarDesignation || designation instanceof MemoryRowDesignation) {
+                if (watchItem.bit === undefined) {
+                    treeItem = new ScalarTreeItem(this.provider, designation, 'inWatchList');
+                } else {
+                    treeItem = new BitTreeItem(this.provider, designation, watchItem.bit, 'inWatchList');
+                }
+            }
+            if (treeItem !== undefined) {
+                treeItem.metadata = { index };
+                children.push(treeItem);
             }
         }
         return children;
@@ -180,6 +264,8 @@ export class TreeDataProvider implements vscode.TreeDataProvider<TreeItem> {
 
     private session: Session | null = null;
     private observer: Observer | null = null;
+    private watchTreeItem: WatchTreeItem | null = null;
+    private scopeTreeItem: ScopeTreeItem | null = null;
 
     constructor(rtlDebugger: CXXRTLDebugger) {
         vscode.workspace.onDidChangeConfiguration((event) => {
@@ -187,15 +273,24 @@ export class TreeDataProvider implements vscode.TreeDataProvider<TreeItem> {
                 this._onDidChangeTreeData.fire(null);
             }
         });
-        rtlDebugger.onDidChangeSession((session) => {
+        rtlDebugger.onDidChangeSession(async (session) => {
             this.session = session;
             if (session !== null) {
                 this.observer = new Observer(session, 'sidebar');
+                this.watchTreeItem = new WatchTreeItem(this);
+                this.scopeTreeItem = new ScopeTreeItem(this, await session.getRootScope());
             } else {
                 this.observer?.dispose();
                 this.observer = null;
+                this.watchTreeItem = null;
+                this.scopeTreeItem = null;
             }
             this._onDidChangeTreeData.fire(null);
+        });
+        watchList.onDidChange((_items) => {
+            if (this.watchTreeItem !== null) {
+                this._onDidChangeTreeData.fire(this.watchTreeItem);
+            }
         });
     }
 
@@ -207,18 +302,23 @@ export class TreeDataProvider implements vscode.TreeDataProvider<TreeItem> {
         if (element !== undefined) {
             return await element.getChildren();
         }
-        if (this.session !== null) {
-            return [
-                new ScopeTreeItem(this, await this.session.getRootScope()),
-            ];
-        } else {
-            return [];
+        const children = [];
+        if (this.watchTreeItem !== null) {
+            children.push(this.watchTreeItem);
         }
+        if (this.scopeTreeItem !== null) {
+            children.push(this.scopeTreeItem);
+        }
+        return children;
     }
 
     get displayStyle(): DisplayStyle {
         const displayStyle = vscode.workspace.getConfiguration('rtlDebugger').get('displayStyle');
         return displayStyle as DisplayStyle;
+    }
+
+    getVariable(identifier: string): Promise<Variable | null> {
+        return this.session!.getVariable(identifier);
     }
 
     getValue<T>(element: TreeItem, designation: Designation<T>): T | undefined {

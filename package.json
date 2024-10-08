@@ -23,9 +23,7 @@
       "$comment": "UPSTREAM: Unfortunately there is no way to control the formatting of the extension name within the setting title. See microsoft/vscode#103592",
       "properties": {
         "rtlDebugger.command": {
-          "type": [
-            "array"
-          ],
+          "type": "array",
           "items": {
             "type": "string"
           },
@@ -60,6 +58,20 @@
           ],
           "default": "Verilog",
           "markdownDescription": "Specifies the display format for variables."
+        },
+        "rtlDebugger.watchList": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "id": {"type": "string"},
+              "row": {"type": "integer"},
+              "bit": {"type": "integer"}
+            },
+            "required": ["id"],
+            "additionalProperties": false
+          },
+          "description": "Specifies the list of variables being watched separately."
         }
       }
     },
@@ -104,6 +116,18 @@
         "category": "RTL Debugger",
         "title": "Step Backward",
         "icon": "$(debug-step-back)"
+      },
+      {
+        "command": "rtlDebugger.watchVariable",
+        "category": "RTL Debugger",
+        "title": "Watch Variable",
+        "icon": "$(eye-watch)"
+      },
+      {
+        "command": "rtlDebugger.unWatchVariable",
+        "category": "RTL Debugger",
+        "title": "Stop Watching",
+        "icon": "$(remove)"
       }
     ],
     "viewsContainers": {
@@ -196,6 +220,18 @@
           "command": "rtlDebugger.stopSession",
           "when": "view == rtlDebugger.sidebar && rtlDebugger.sessionStatus == running",
           "group": "navigation@5"
+        }
+      ],
+      "view/item/context": [
+        {
+          "command": "rtlDebugger.watchVariable",
+          "when": "view == rtlDebugger.sidebar && viewItem == canWatch",
+          "group": "inline"
+        },
+        {
+          "command": "rtlDebugger.unWatchVariable",
+          "when": "view == rtlDebugger.sidebar && viewItem == inWatchList",
+          "group": "inline"
         }
       ]
     }

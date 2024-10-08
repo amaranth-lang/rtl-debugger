@@ -1,3 +1,6 @@
 {
-    "rtlDebugger.command": ["${workspaceFolder}/design_sim"]
+    "rtlDebugger.command": [
+        "${workspaceFolder}/design_sim"
+    ],
+    "rtlDebugger.watchList": []
 }
