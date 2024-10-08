@@ -1,22 +1,29 @@
 import * as net from 'net';
 import * as vscode from 'vscode';
 import { NodeStreamLink } from './cxxrtl/link';
-import { CXXRTLConnection, CXXRTLDebugItem, CXXRTLDebugItemType, CXXRTLNodeDesignation, CXXRTLSimulationStatus } from './connection';
-import { TimePoint } from './model/time';
+import { Connection } from './cxxrtl/client';
+import { TimeInterval, TimePoint } from './model/time';
 import { Scope } from './model/scope';
 import { Variable } from './model/variable';
-import { StatusItemController } from './ui/status';
+import { StatusBarItem } from './ui/status';
+import { BoundReference, Reference, Sample } from './model/sample';
+
+export enum CXXRTLSimulationStatus {
+    Paused = 'paused',
+    Running = 'running',
+    Finished = 'finished',
+}
 
 export enum CXXRTLSessionStatus {
-    Absent = "absent",
-    Starting = "starting",
-    Running = "running",
+    Absent = 'absent',
+    Starting = 'starting',
+    Running = 'running',
 }
 
 export class CXXRTLDebugger {
-    private statusItemController: StatusItemController;
+    private statusBarItem: StatusBarItem;
     private terminal: vscode.Terminal | null = null;
-    private connection: CXXRTLConnection | null = null;
+    private connection: Connection | null = null;
 
     // Session properties.
 
@@ -45,10 +52,11 @@ export class CXXRTLDebugger {
     readonly onDidChangeLatestTime: vscode.Event<TimePoint> = this._onDidChangeLatestTime.event;
 
     constructor() {
-        this.statusItemController = new StatusItemController(this);
+        this.statusBarItem = new StatusBarItem(this);
     }
 
     public dispose() {
+        this.statusBarItem.dispose();
         this._onDidChangeCurrentTime.dispose();
         this._onDidChangeSimulationStatus.dispose();
     }
@@ -80,7 +88,7 @@ export class CXXRTLDebugger {
                     vscode.window.showInformationMessage("Connected to the CXXRTL server.");
 
                     (async () => {
-                        this.connection = new CXXRTLConnection(new NodeStreamLink(socket));
+                        this.connection = new Connection(new NodeStreamLink(socket));
                         this.setSessionStatus(CXXRTLSessionStatus.Running);
                         this.updateSimulationStatus();
                         console.log("[RTL Debugger] Initialized");
@@ -140,7 +148,13 @@ export class CXXRTLDebugger {
     }
 
     public async runSimulation(): Promise<void> {
-        await this.connection!.runSimulation();
+        await this.connection!.runSimulation({
+            type: 'command',
+            command: 'run_simulation',
+            until_time: null,
+            until_diagnostics: [],
+            sample_item_values: true,
+        });
         await this.updateSimulationStatus();
     }
 
@@ -162,41 +176,38 @@ export class CXXRTLDebugger {
             },
         });
         if (untilTime !== undefined) {
-            await this.connection!.runSimulation({ untilTime: TimePoint.fromString(untilTime) });
+            await this.connection!.runSimulation({
+                type: 'command',
+                command: 'run_simulation',
+                until_time: TimePoint.fromString(untilTime).toCXXRTL(),
+                until_diagnostics: [],
+                sample_item_values: true,
+            });
             await this.updateSimulationStatus();
         }
     }
 
     public async pauseSimulation(): Promise<void> {
-        const latestTime = await this.connection!.pauseSimulation();
+        const cxxrtlResponse = await this.connection!.pauseSimulation({
+            type: 'command',
+            command: 'pause_simulation',
+        });
+        const latestTime = TimePoint.fromCXXRTL(cxxrtlResponse.time);
         this.setSimulationStatus(CXXRTLSimulationStatus.Paused, latestTime);
-    }
-
-    public async getVariableValues(variables: CXXRTLDebugItem[]): Promise<Map<string, bigint>> {
-        if (!this.connection) {
-            return new Map();
-        }
-        const designations = [];
-        for (const variable of variables) {
-            if (variable.type === CXXRTLDebugItemType.Node) {
-                designations.push(new CXXRTLNodeDesignation(variable));
-            }
-        }
-        const reference = await this.connection.referenceItems("getVariableValues", designations);
-        const samples = await this.connection.queryInterval(this.currentTime, this.currentTime, reference);
-        await this.connection.referenceItems("getVariableValues", []);
-        if (samples.length !== 1) {
-            throw new Error("Expected one sample");
-        }
-        return new Map(Array.from(samples[0].values().entries()).map(([designation, value]) => [designation.name, value]));
     }
 
     private async updateSimulationStatus(): Promise<void> {
         if (!this.connection) {
             return;
         }
-        const { status, latestTime } = await this.connection.getSimulationStatus();
-        this.setSimulationStatus(status, latestTime);
+        const cxxrtlResponse = await this.connection.getSimulationStatus({
+            type: 'command',
+            command: 'get_simulation_status',
+        });
+        this.setSimulationStatus(
+            cxxrtlResponse.status as CXXRTLSimulationStatus,
+            TimePoint.fromCXXRTL(cxxrtlResponse.latest_time)
+        );
     }
 
     private setSessionStatus(sessionState: CXXRTLSessionStatus): void {
@@ -223,10 +234,8 @@ export class CXXRTLDebugger {
         }
     }
 
-    // new API
-
     private async getVariablesForScope(cxxrtlScopeName: string): Promise<Variable[]> {
-        const cxxrtlResponse = await this.connection!.connection.listItems({
+        const cxxrtlResponse = await this.connection!.listItems({
             type: 'command',
             command: 'list_items',
             scope: cxxrtlScopeName,
@@ -236,7 +245,7 @@ export class CXXRTLDebugger {
     }
 
     public async getRootScope(): Promise<Scope> {
-        const cxxrtlResponse = await this.connection!.connection.listScopes({
+        const cxxrtlResponse = await this.connection!.listScopes({
             type: 'command',
             command: 'list_scopes',
         });
@@ -264,5 +273,65 @@ export class CXXRTLDebugger {
             }
         }
         return rootScope!;
+    }
+
+    private readonly referenceEpochs: Map<string, number> = new Map();
+
+    private advanceReferenceEpoch(name: string): number {
+        const epoch = (this.referenceEpochs.get(name) || 0) + 1;
+        this.referenceEpochs.set(name, epoch);
+        return epoch;
+    }
+
+    private verifyReferenceEpoch(name: string, requestedEpoch: number) {
+        const currentEpoch = this.referenceEpochs.get(name);
+        if (currentEpoch !== requestedEpoch) {
+            throw new ReferenceError(
+                `Querying out-of-date reference ${name}#${requestedEpoch}; ` +
+                `the current binding is ${name}#${currentEpoch}`);
+        }
+    }
+
+    public bindReference(name: string, reference: Reference): BoundReference {
+        const epoch = this.advanceReferenceEpoch(name);
+        // Note that we do not wait for the command to complete. Although it is possible for
+        // the command to fail, this would only happen if one of the designations is invalid,
+        // which should never happen absent bugs. We still report the error in that case.
+        this.connection!.referenceItems({
+            type: 'command',
+            command: 'reference_items',
+            reference: name,
+            items: reference.cxxrtlItemDesignations()
+        }).catch((error) => {
+            console.error(`[CXXRTL] invalid designation while binding reference`,
+                `${name}#${epoch}`, error);
+        });
+        return new BoundReference(name, epoch, reference);
+    }
+
+    public async queryInterval(interval: TimeInterval, reference: BoundReference): Promise<Sample[]> {
+        this.verifyReferenceEpoch(reference.name, reference.epoch);
+        const cxxrtlResponse = await this.connection!.queryInterval({
+            type: 'command',
+            command: 'query_interval',
+            interval: interval.toCXXRTL(),
+            collapse: true,
+            items: reference.name,
+            item_values_encoding: 'base64(u32)',
+            diagnostics: false
+        });
+        return cxxrtlResponse.samples.map((cxxrtlSample) => {
+            const itemValuesBuffer = Buffer.from(cxxrtlSample.item_values!, 'base64');
+            const itemValuesArray = new Uint32Array(
+                itemValuesBuffer.buffer,
+                itemValuesBuffer.byteOffset,
+                itemValuesBuffer.length / Uint32Array.BYTES_PER_ELEMENT
+            );
+            return new Sample(
+                TimePoint.fromCXXRTL(cxxrtlSample.time),
+                reference.unbound,
+                itemValuesArray
+            );
+        });
     }
 }

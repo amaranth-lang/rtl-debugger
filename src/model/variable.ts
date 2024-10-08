@@ -43,12 +43,13 @@ export abstract class Variable {
     get cxxrtlIdentifier(): string {
         return this.fullName.join(' ');
     }
-}
 
-export class ScalarVariable extends Variable {
     cxxrtlItemDesignation(): proto.ItemDesignation {
         return [this.cxxrtlIdentifier];
     }
+}
+
+export class ScalarVariable extends Variable {
 }
 
 export class MemoryVariable extends Variable {
@@ -63,9 +64,9 @@ export class MemoryVariable extends Variable {
         super(fullName, location, lsbAt, width);
     }
 
-    cxxrtlItemDesignation(): proto.ItemDesignation;
-    cxxrtlItemDesignation(first: number, last: number): proto.ItemDesignation;
-    cxxrtlItemDesignation(first: number = 0, last: number = this.depth): proto.ItemDesignation {
+    override cxxrtlItemDesignation(): proto.ItemDesignation;
+    override cxxrtlItemDesignation(first: number, last: number): proto.ItemDesignation; // inclusive!
+    override cxxrtlItemDesignation(first: number = 0, last: number = this.depth - 1): proto.ItemDesignation {
         if (first < 0 || first > this.depth) {
             throw new RangeError(`Start index ${first} out of range`);
         }

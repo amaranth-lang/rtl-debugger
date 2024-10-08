@@ -1,8 +1,7 @@
 import * as vscode from 'vscode';
-import { CXXRTLDebugger, CXXRTLSessionStatus } from '../debugger';
-import { CXXRTLSimulationStatus } from '../connection';
+import { CXXRTLDebugger, CXXRTLSessionStatus, CXXRTLSimulationStatus } from '../debugger';
 
-export class StatusItemController {
+export class StatusBarItem {
     private statusItem: vscode.StatusBarItem;
     private subscriptions: vscode.Disposable[] = [];
 

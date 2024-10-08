@@ -1,6 +1,5 @@
 import * as vscode from 'vscode';
-import { CXXRTLDebugger } from './debugger';
-import { CXXRTLSimulationStatus } from './connection';
+import { CXXRTLDebugger, CXXRTLSimulationStatus } from './debugger';
 import * as sidebar from './ui/sidebar';
 
 export function activate(context: vscode.ExtensionContext) {

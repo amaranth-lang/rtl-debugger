@@ -90,7 +90,7 @@ export class TimePoint {
         }
     }
 
-    public static fromJSON(value: string): TimePoint {
+    public static fromCXXRTL(value: string): TimePoint {
         const matches = value.match(/^(\d+)\.(\d+)$/);
         if (matches === null) {
             throw new SyntaxError(`${JSON.stringify(value)} is not a valid time point`);
@@ -98,7 +98,7 @@ export class TimePoint {
         return new TimePoint(BigInt(matches[1]), BigInt(matches[2]));
     }
 
-    public toJSON(): string {
+    public toCXXRTL(): string {
         return `${this.secs.toString()}.${this.femtos.toString().padStart(15, '0')}`;
     }
 }
@@ -106,11 +106,11 @@ export class TimePoint {
 export class TimeInterval {
     constructor(public begin: TimePoint, public end: TimePoint) {}
 
-    public static fromJSON([begin, end]: [string, string]): TimeInterval {
-        return new TimeInterval(TimePoint.fromJSON(begin), TimePoint.fromJSON(end));
+    public static fromCXXRTL([begin, end]: [string, string]): TimeInterval {
+        return new TimeInterval(TimePoint.fromCXXRTL(begin), TimePoint.fromCXXRTL(end));
     }
 
-    public toJSON(): [string, string] {
-        return [this.begin.toJSON(), this.end.toJSON()];
+    public toCXXRTL(): [string, string] {
+        return [this.begin.toCXXRTL(), this.end.toCXXRTL()];
     }
 }

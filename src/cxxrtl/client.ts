@@ -47,23 +47,23 @@ export class Connection {
     private traceSend(packet: proto.ClientPacket) {
         this.timestamps.push(new Date());
         if (packet.type === 'greeting') {
-            console.debug(`C>S`, packet);
+            console.debug(`[CXXRTL] C>S`, packet);
         } else if (packet.type === 'command') {
-            console.debug(`C>S#${this.sendIndex++}`, packet);
+            console.debug(`[CXXRTL] C>S#${this.sendIndex++}`, packet);
         }
     }
 
     private traceRecv(packet: proto.ServerPacket) {
         if (packet.type === 'greeting') {
-            console.debug(`S>C`, packet);
+            console.debug(`[CXXRTL] S>C`, packet);
         } else if (packet.type === 'response') {
             const elapsed = new Date().getTime() - this.timestamps.shift()!.getTime();
-            console.debug(`S>C#${this.recvIndex++}`, packet, `(${elapsed}ms)`);
+            console.debug(`[CXXRTL] S>C#${this.recvIndex++}`, packet, `(${elapsed}ms)`);
         } else if (packet.type === 'error') {
             this.timestamps.shift();
-            console.error(`S>C#${this.recvIndex++}`, packet);
+            console.error(`[CXXRTL] S>C#${this.recvIndex++}`, packet);
         } else if (packet.type === 'event') {
-            console.debug(`S>C`, packet);
+            console.debug(`[CXXRTL] S>C`, packet);
         }
     }
 
