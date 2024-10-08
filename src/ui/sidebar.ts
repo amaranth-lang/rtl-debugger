@@ -167,7 +167,7 @@ class ScopeTreeItem extends TreeItem {
 
     override async getTreeItem(): Promise<vscode.TreeItem> {
         if (this.scope.name === '') {
-            return new vscode.TreeItem('Hierarchy', vscode.TreeItemCollapsibleState.Expanded);
+            return new vscode.TreeItem('ʜɪᴇʀᴀʀᴄʜʏ', vscode.TreeItemCollapsibleState.Expanded);
         } else {
             const treeItem = new vscode.TreeItem(this.scope.name);
             treeItem.iconPath = new vscode.ThemeIcon('symbol-module');
@@ -217,9 +217,9 @@ class WatchTreeItem extends TreeItem {
 
     override async getTreeItem(): Promise<vscode.TreeItem> {
         if (globalWatchList.get().length > 0) {
-            return new vscode.TreeItem('Watch', vscode.TreeItemCollapsibleState.Expanded);
+            return new vscode.TreeItem('ᴡᴀᴛᴄʜ', vscode.TreeItemCollapsibleState.Expanded);
         } else {
-            return new vscode.TreeItem('Watch (empty)');
+            return new vscode.TreeItem('ᴡᴀᴛᴄʜ (empty)');
         }
     }
 
