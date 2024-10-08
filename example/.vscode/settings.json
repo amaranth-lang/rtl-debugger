@@ -2,5 +2,14 @@
     "rtlDebugger.command": [
         "${workspaceFolder}/design_sim"
     ],
-    "rtlDebugger.watchList": []
+    "rtlDebugger.watchList": [
+        {
+            "id": "data"
+        }
+    ],
+    "rtlDebugger.variableOptions": {
+        "data": {
+            "radix": 16
+        }
+    }
 }

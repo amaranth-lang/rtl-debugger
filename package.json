@@ -59,6 +59,17 @@
           "default": "Verilog",
           "markdownDescription": "Specifies the display format for variables."
         },
+        "rtlDebugger.variableOptions": {
+          "type": "object",
+          "patternProperties": {
+            "": {
+              "type": "object",
+              "properties": {
+                "radix": "number"
+              }
+            }
+          }
+        },
         "rtlDebugger.watchList": {
           "type": "array",
           "items": {
@@ -116,6 +127,26 @@
         "category": "RTL Debugger",
         "title": "Step Backward",
         "icon": "$(debug-step-back)"
+      },
+      {
+        "command": "rtlDebugger.setRadix.2",
+        "category": "RTL Debugger",
+        "title": "Use Radix 2"
+      },
+      {
+        "command": "rtlDebugger.setRadix.8",
+        "category": "RTL Debugger",
+        "title": "Use Radix 8"
+      },
+      {
+        "command": "rtlDebugger.setRadix.10",
+        "category": "RTL Debugger",
+        "title": "Use Radix 10"
+      },
+      {
+        "command": "rtlDebugger.setRadix.16",
+        "category": "RTL Debugger",
+        "title": "Use Radix 16"
       },
       {
         "command": "rtlDebugger.watchVariable",
@@ -224,17 +255,45 @@
       ],
       "view/item/context": [
         {
+          "submenu": "rtlDebugger.setRadix",
+          "when": "view == rtlDebugger.sidebar && viewItem =~ /canSetRadix/"
+        },
+        {
           "command": "rtlDebugger.watchVariable",
-          "when": "view == rtlDebugger.sidebar && viewItem == canWatch",
+          "when": "view == rtlDebugger.sidebar && viewItem =~ /canWatch/",
           "group": "inline"
         },
         {
           "command": "rtlDebugger.unWatchVariable",
-          "when": "view == rtlDebugger.sidebar && viewItem == inWatchList",
+          "when": "view == rtlDebugger.sidebar && viewItem =~ /inWatchList/",
           "group": "inline"
         }
+      ],
+      "rtlDebugger.setRadix": [
+        {
+          "command": "rtlDebugger.setRadix.2",
+          "group": "radix@2"
+        },
+        {
+          "command": "rtlDebugger.setRadix.8",
+          "group": "radix@8"
+        },
+        {
+          "command": "rtlDebugger.setRadix.10",
+          "group": "radix@10"
+        },
+        {
+          "command": "rtlDebugger.setRadix.16",
+          "group": "radix@16"
+        }
       ]
-    }
+    },
+    "submenus": [
+      {
+        "id": "rtlDebugger.setRadix",
+        "label": "Radix"
+      }
+    ]
   },
   "scripts": {
     "lint": "eslint --fix",

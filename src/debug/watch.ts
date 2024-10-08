@@ -15,7 +15,7 @@ export interface IWatchList {
     onDidChange(callback: (items: IWatchItem[]) => any): vscode.Disposable;
 }
 
-export const watchList: IWatchList = {
+export const globalWatchList: IWatchList = {
     get(): IWatchItem[] {
         return vscode.workspace.getConfiguration('rtlDebugger').get('watchList') || [];
     },
@@ -37,7 +37,7 @@ export const watchList: IWatchList = {
     onDidChange(callback: (items: IWatchItem[]) => any): vscode.Disposable {
         return vscode.workspace.onDidChangeConfiguration((event) => {
             if (event.affectsConfiguration('rtlDebugger.watchList')) {
-                callback(watchList.get());
+                callback(globalWatchList.get());
             }
         });
     },

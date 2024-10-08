@@ -6,7 +6,7 @@ import { DisplayStyle, variableDescription, variableBitIndices, memoryRowIndices
 import { CXXRTLDebugger } from '../debugger';
 import { Observer } from '../debug/observer';
 import { Designation, MemoryRangeDesignation, MemoryRowDesignation, ScalarDesignation } from '../model/sample';
-import { IWatchItem, watchList } from '../debug/watch';
+import { IWatchItem, globalWatchList } from '../debug/watch';
 import { Session } from '../debug/session';
 
 abstract class TreeItem {
@@ -37,7 +37,7 @@ class BitTreeItem extends TreeItem {
         provider: TreeDataProvider,
         readonly designation: ScalarDesignation | MemoryRowDesignation,
         readonly bitIndex: number,
-        readonly contextValue?: string,
+        readonly contextValue: string = '',
     ) {
         super(provider);
     }
@@ -81,7 +81,7 @@ class ScalarTreeItem extends TreeItem {
     constructor(
         provider: TreeDataProvider,
         readonly designation: ScalarDesignation | MemoryRowDesignation,
-        readonly contextValue?: string,
+        readonly contextValue: string = '',
     ) {
         super(provider);
     }
@@ -127,7 +127,7 @@ class ArrayTreeItem extends TreeItem {
     constructor(
         provider: TreeDataProvider,
         readonly designation: MemoryRangeDesignation,
-        readonly contextValue?: string,
+        readonly contextValue: string = '',
     ) {
         super(provider);
     }
@@ -197,10 +197,11 @@ class ScopeTreeItem extends TreeItem {
         }
         for (const variable of await this.scope.variables) {
             if (variable instanceof ScalarVariable) {
-                children.push(new ScalarTreeItem(this.provider, variable.designation(), 'canWatch'));
+                children.push(new ScalarTreeItem(this.provider, variable.designation(),
+                    variable.width > 1 ? 'canWatch|canSetRadix' : 'canWatch'));
             }
             if (variable instanceof MemoryVariable) {
-                children.push(new ArrayTreeItem(this.provider, variable.designation(), 'canWatch'));
+                children.push(new ArrayTreeItem(this.provider, variable.designation(), 'canWatch|canSetRadix'));
             }
         }
         return children;
@@ -215,7 +216,7 @@ class WatchTreeItem extends TreeItem {
     }
 
     override async getTreeItem(): Promise<vscode.TreeItem> {
-        if (watchList.get().length > 0) {
+        if (globalWatchList.get().length > 0) {
             return new vscode.TreeItem('Watch', vscode.TreeItemCollapsibleState.Expanded);
         } else {
             return new vscode.TreeItem('Watch (empty)');
@@ -224,7 +225,7 @@ class WatchTreeItem extends TreeItem {
 
     override async getChildren(): Promise<TreeItem[]> {
         const children = [];
-        for (const [index, watchItem] of watchList.get().entries()) {
+        for (const [index, watchItem] of globalWatchList.get().entries()) {
             const variable = await this.provider.getVariable(watchItem.id);
             if (variable === null) {
                 continue;
@@ -241,10 +242,11 @@ class WatchTreeItem extends TreeItem {
             }
             let treeItem;
             if (designation instanceof MemoryRangeDesignation) {
-                treeItem = new ArrayTreeItem(this.provider, designation, 'inWatchList');
+                treeItem = new ArrayTreeItem(this.provider, designation, 'inWatchList|canSetRadix');
             } else if (designation instanceof ScalarDesignation || designation instanceof MemoryRowDesignation) {
                 if (watchItem.bit === undefined) {
-                    treeItem = new ScalarTreeItem(this.provider, designation, 'inWatchList');
+                    treeItem = new ScalarTreeItem(this.provider, designation,
+                        designation.variable.width > 1 ? 'inWatchList|canSetRadix' : 'inWatchList');
                 } else {
                     treeItem = new BitTreeItem(this.provider, designation, watchItem.bit, 'inWatchList');
                 }
@@ -269,7 +271,8 @@ export class TreeDataProvider implements vscode.TreeDataProvider<TreeItem> {
 
     constructor(rtlDebugger: CXXRTLDebugger) {
         vscode.workspace.onDidChangeConfiguration((event) => {
-            if (event.affectsConfiguration('rtlDebugger.displayStyle')) {
+            if (event.affectsConfiguration('rtlDebugger.displayStyle') ||
+                    event.affectsConfiguration('rtlDebugger.variableOptions')) {
                 this._onDidChangeTreeData.fire(null);
             }
         });
@@ -287,7 +290,7 @@ export class TreeDataProvider implements vscode.TreeDataProvider<TreeItem> {
             }
             this._onDidChangeTreeData.fire(null);
         });
-        watchList.onDidChange((_items) => {
+        globalWatchList.onDidChange((_items) => {
             if (this.watchTreeItem !== null) {
                 this._onDidChangeTreeData.fire(this.watchTreeItem);
             }

@@ -1,6 +1,7 @@
 import * as vscode from 'vscode';
 
 import { MemoryVariable, ScalarVariable, Variable } from './variable';
+import { globalVariableOptions } from '../debug/options';
 
 export enum DisplayStyle {
     Python = 'Python',
@@ -65,15 +66,24 @@ export function* memoryRowIndices(variable: MemoryVariable): Generator<number> {
     }
 }
 
-export function variableValue(style: DisplayStyle, variable: Variable, value: bigint | undefined, base: 2 | 8 | 10 | 16 = 10): string {
+export function variableValue(style: DisplayStyle, variable: Variable, value: bigint | undefined, radix?: 2 | 8 | 10 | 16): string {
     if (value === undefined) {
         return '...';
-    } else if (variable.width === 1) {
+    }
+
+    // There is a bug in CXXRTL that occasionally causes out-of-bounds bits to be set.
+    // Ideally it should be fixed there, but for now let's work around it here, for usability.
+    value &= (1n << BigInt(variable.width)) - 1n;
+
+    if (variable.width === 1) {
         return value.toString();
     } else {
+        if (radix === undefined) {
+            radix = globalVariableOptions.get(variable.cxxrtlIdentifier).radix ?? 10;
+        }
         switch (style) {
             case DisplayStyle.Python:
-                switch (base) {
+                switch (radix) {
                     case 2:  return `0b${value.toString(2)}`;
                     case 8:  return `0o${value.toString(8)}`;
                     case 10: return      value.toString(10);
@@ -81,10 +91,10 @@ export function variableValue(style: DisplayStyle, variable: Variable, value: bi
                 }
 
             case DisplayStyle.Verilog:
-                return `${base}'${value.toString(base)}`;
+                return `${radix}'${value.toString(radix)}`;
 
             case DisplayStyle.VHDL:
-                switch (base) {
+                switch (radix) {
                     case 2:  return `B"${value.toString(2)}"`;
                     case 8:  return `O"${value.toString(8)}"`;
                     case 10: return      value.toString(10);

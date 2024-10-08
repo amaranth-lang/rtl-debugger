@@ -1,8 +1,9 @@
 import * as vscode from 'vscode';
-import { watchList } from './debug/watch';
+import { globalWatchList } from './debug/watch';
 import { CXXRTLDebugger } from './debugger';
 import * as sidebar from './ui/sidebar';
 import { inputTime } from './ui/input';
+import { globalVariableOptions } from './debug/options';
 
 export function activate(context: vscode.ExtensionContext) {
     const rtlDebugger = new CXXRTLDebugger();
@@ -50,10 +51,19 @@ export function activate(context: vscode.ExtensionContext) {
     context.subscriptions.push(vscode.commands.registerCommand('rtlDebugger.stepForward', () =>
         rtlDebugger.session!.stepForward()));
 
+    context.subscriptions.push(vscode.commands.registerCommand('rtlDebugger.setRadix.2', (treeItem) =>
+        globalVariableOptions.update(treeItem.designation.variable.cxxrtlIdentifier, { radix: 2 })));
+    context.subscriptions.push(vscode.commands.registerCommand('rtlDebugger.setRadix.8', (treeItem) =>
+        globalVariableOptions.update(treeItem.designation.variable.cxxrtlIdentifier, { radix: 8 })));
+    context.subscriptions.push(vscode.commands.registerCommand('rtlDebugger.setRadix.10', (treeItem) =>
+        globalVariableOptions.update(treeItem.designation.variable.cxxrtlIdentifier, { radix: 10 })));
+    context.subscriptions.push(vscode.commands.registerCommand('rtlDebugger.setRadix.16', (treeItem) =>
+        globalVariableOptions.update(treeItem.designation.variable.cxxrtlIdentifier, { radix: 16 })));
+
     context.subscriptions.push(vscode.commands.registerCommand('rtlDebugger.watchVariable', (treeItem) =>
-        watchList.append(treeItem.getWatchItem())));
+        globalWatchList.append(treeItem.getWatchItem())));
     context.subscriptions.push(vscode.commands.registerCommand('rtlDebugger.unWatchVariable', (treeItem) =>
-        watchList.remove(treeItem.metadata.index)));
+        globalWatchList.remove(treeItem.metadata.index)));
 
     // For an unknown reason, the `vscode.open` command (which does the exact same thing) ignores the options.
     context.subscriptions.push(vscode.commands.registerCommand('rtlDebugger.openDocument',
