@@ -2,175 +2,191 @@ import * as proto from '../cxxrtl/proto';
 import { TimePoint } from './time';
 import { MemoryVariable, ScalarVariable, Variable } from './variable';
 
-function chunksForBits(width: number): number {
-    return 0 | ((width + 31) / 32);
-}
+class DataRange {
+    readonly stride: number;
+    readonly count: number;
 
-function getChunksAt(array: Uint32Array, offset: number, count: number) {
-    let value = 0n;
-    for (let index = offset; index < offset + count; index++) {
-        value = (value << 32n) + BigInt(array[offset]);
+    constructor(variable: Variable, count: number = 1) {
+        this.stride = 0 | ((variable.width + 31) / 32);
+        this.count = count;
     }
-    return value;
+
+    get size() {
+        return this.stride * this.count;
+    }
+
+    bigintFromRaw(data: Uint32Array, offset: number = 0) {
+        if (!(offset <= this.count)) {
+            throw RangeError(`Offset ${offset} out of bounds for data range with ${this.count} elements`);
+        }
+        let value = 0n;
+        for (let index = 0; index < this.stride; index++) {
+            value = (value << 32n) + BigInt(data[this.stride * offset + index]);
+        }
+        return value;
+    }
 }
 
-// This class is a bit weird because the CXXRTL range designator is inclusive and has configurable
-// direction. I.e. `[0, 1]` and `[1, 0]` both designate two rows, in opposite order.
-class ReferenceSlice {
-    constructor(
-        readonly offset: number, // in chunks
-        readonly variable: Variable,
-        readonly range?: [number, number],
-    ) {}
+export abstract class Designation<T> {
+    abstract variable: Variable;
 
-    get size(): number {
-        return this.count * this.stride;
+    abstract get canonicalKey(): string;
+
+    abstract get cxxrtlItemDesignation(): proto.ItemDesignation;
+
+    abstract dataRange(): DataRange;
+
+    abstract extractFromRaw(data: Uint32Array): T;
+}
+
+export class ScalarDesignation extends Designation<bigint> {
+    constructor(
+        readonly variable: ScalarVariable,
+    ) {
+        super();
+    }
+
+    get canonicalKey(): string {
+        return this.variable.fullName.join(' ');
+    }
+
+    get cxxrtlItemDesignation(): proto.ItemDesignation {
+        return [this.variable.cxxrtlIdentifier];
+    }
+
+    override dataRange(): DataRange {
+        return new DataRange(this.variable);
+    }
+
+    override extractFromRaw(data: Uint32Array): bigint {
+        return this.dataRange().bigintFromRaw(data);
+    }
+}
+
+export class MemoryRowDesignation extends Designation<bigint> {
+    constructor(
+        readonly variable: MemoryVariable,
+        readonly index: number,
+    ) {
+        super();
+    }
+
+    get canonicalKey(): string {
+        return `${this.variable.fullName.join(' ')}\u0000${this.index}`;
+    }
+
+    get cxxrtlItemDesignation(): proto.ItemDesignation {
+        return [this.variable.cxxrtlIdentifier, this.index, this.index];
+    }
+
+    override dataRange(): DataRange {
+        return new DataRange(this.variable);
+    }
+
+    override extractFromRaw(data: Uint32Array): bigint {
+        return this.dataRange().bigintFromRaw(data);
+    }
+}
+
+export class MemoryRangeDesignation extends Designation<Iterable<bigint>> {
+    constructor(
+        readonly variable: MemoryVariable,
+        readonly first: number,
+        readonly last: number,
+    ) {
+        super();
+    }
+
+    get canonicalKey(): string {
+        return `${this.variable.fullName.join(' ')}\u0000${this.first}\u0000${this.last}`;
+    }
+
+    get cxxrtlItemDesignation(): proto.ItemDesignation {
+        return [this.variable.cxxrtlIdentifier, this.first, this.last];
     }
 
     get count(): number {
-        if (this.range === undefined) {
-            return 1; // scalar
-        } else {
-            const [first, last] = this.range;
-            return (last >= first) ? (last - first + 1) : (first - last + 1);
-        }
+        return (this.last >= this.first) ? (this.last - this.first + 1) : (this.first - this.last + 1);
     }
 
-    get stride(): number {
-        return chunksForBits(this.variable.width);
+    override dataRange(): DataRange {
+        return new DataRange(this.variable, this.count);
     }
 
-    hasIndex(index: number): boolean {
-        let begin, end;
-        if (this.range === undefined) {
-            begin = 0;
-            end = 1;
-        } else {
-            const [first, last] = this.range;
-            if (last >= first) {
-                begin = first;
-                end = last + 1;
-            } else {
-                begin = last;
-                end = first + 1;
-            }
-        }
-        return (index >= begin && index < end);
-    }
-
-    offsetForIndex(index: number): number {
-        if (this.range === undefined) {
-            return this.offset;
-        }
-        const [first, last] = this.range;
-        if (last >= first) {
-            return this.offset + this.stride * (index - first);
-        } else {
-            return this.offset + this.stride * (index - last);
+    *extractFromRaw(data: Uint32Array): Iterable<bigint> {
+        for (let offset = 0; offset < this.count; offset++) {
+            yield this.dataRange().bigintFromRaw(data, offset);
         }
     }
 }
 
-export class Reference {
-    private frozen: boolean = false;
-    private totalSize: number = 0; // in chunks
-    private slices: ReferenceSlice[] = [];
-    private variables: Map<Variable, ReferenceSlice> = new Map();
+export class Handle<T> {
+    constructor(
+        readonly designation: Designation<T>,
+        readonly reference: UnboundReference,
+        readonly offset: number,
+    ) {}
 
-    constructor(variables: Variable[] = []) {
-        for (const variable of variables) {
-            this.add(variable);
+    extractFromRaw(data: Uint32Array): T {
+        return this.designation.extractFromRaw(data.subarray(this.offset));
+    }
+}
+
+export class UnboundReference {
+    private frozen: boolean = false;
+    private offset: number = 0; // in chunks
+    private handles: Handle<any>[] = [];
+
+    add<T>(designation: Designation<T>): Handle<T> {
+        if (this.frozen) {
+            throw new Error('Cannot add variables to a reference that has been bound to a name');
         }
+        const handle = new Handle(designation, this, this.offset);
+        this.handles.push(handle);
+        this.offset += designation.dataRange().size;
+        return handle;
     }
 
     freeze() {
         this.frozen = true;
     }
 
-    copy(): Reference {
-        const newInstance = new Reference();
-        newInstance.totalSize = this.totalSize;
-        newInstance.slices = this.slices.slice();
-        newInstance.variables = new Map(this.variables.entries());
-        return newInstance;
-    }
-
-    add(variable: Variable): void;
-    add(memory: MemoryVariable, first: number, last: number): void;
-
-    add(variable: Variable, first?: number, last?: number) {
-        if (this.frozen) {
-            throw new Error(`Cannot add variables to a reference that has been bound to a name`);
+    *allHandles(): Iterable<[Designation<any>, Handle<any>]> {
+        for (const handle of this.handles) {
+            yield [handle.designation, handle];
         }
-        if (this.variables.has(variable)) {
-            // This is not a CXXRTL limitation, but a consequence of the use of `Map` for fast
-            // lookup of sample data during extraction.
-            throw new Error(`Unable to reference variable ${variable.fullName} twice`);
-        }
-        let range: [number, number] | undefined;
-        if (variable instanceof MemoryVariable) {
-            if (first === undefined || last === undefined) {
-                range = [0, variable.depth - 1];
-            } else {
-                range = [first, last];
-            }
-        }
-        const slice = new ReferenceSlice(this.totalSize, variable, range);
-        this.totalSize += slice.size;
-        this.slices.push(slice);
-        this.variables.set(variable, slice);
-    }
-
-    extract(variableData: Uint32Array, variable: Variable, index: number = 0): bigint {
-        const slice = this.variables.get(variable);
-        if (slice === undefined) {
-            throw RangeError(`Variable ${variable.fullName} is not referenced`);
-        }
-        if (!slice.hasIndex(index)) {
-            throw RangeError(`Variable ${variable.fullName} is referenced but index ${index} is out of bounds`);
-        }
-        return getChunksAt(variableData, slice.offsetForIndex(index), slice.stride);
     }
 
     cxxrtlItemDesignations(): proto.ItemDesignation[] {
-        return this.slices.map((slice) => {
-            if (slice.variable instanceof ScalarVariable) {
-                return slice.variable.cxxrtlItemDesignation();
-            } else if (slice.variable instanceof MemoryVariable) {
-                if (slice.range === undefined) {
-                    return slice.variable.cxxrtlItemDesignation();
-                } else {
-                    const [first, last] = slice.range;
-                    return slice.variable.cxxrtlItemDesignation(first, last);
-                }
-            } else {
-                throw new Error(`Unknown variable type in ${slice.variable}`);
-            }
-        });
+        return this.handles.map((slice) => slice.designation.cxxrtlItemDesignation);
     }
 }
 
-export class BoundReference {
+export class Reference {
     constructor(
         readonly name: string,
         readonly epoch: number,
-        readonly unbound: Reference,
+        readonly unbound: UnboundReference,
     ) {
         this.unbound.freeze();
+    }
+
+    allHandles(): Iterable<[Designation<any>, Handle<any>]> {
+        return this.unbound.allHandles();
     }
 }
 
 export class Sample {
     constructor(
         readonly time: TimePoint,
-        readonly reference: Reference,
+        readonly reference: UnboundReference,
         readonly variableData: Uint32Array,
     ) {}
 
-    extract(scalar: ScalarVariable): bigint;
-    extract(memory: MemoryVariable, row: number): bigint;
-
-    extract(variable: Variable, offset: number = 0): bigint {
-        return this.reference.extract(this.variableData, variable, offset);
+    extract<T>(handle: Handle<T>): T {
+        if (handle.reference !== this.reference) {
+            throw new ReferenceError('Handle is not bound to the same reference as the sample');
+        }
+        return handle.extractFromRaw(this.variableData);
     }
 }

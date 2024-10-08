@@ -28,21 +28,21 @@ export class StatusBarItem {
         } else {
             this.statusItem.show();
             if (this.rtlDebugger.sessionStatus === CXXRTLSessionStatus.Starting) {
-                this.statusItem.text = `$(gear~spin) Starting...`;
-                this.statusItem.tooltip = `RTL Debugger: Starting`;
+                this.statusItem.text = '$(gear~spin) Starting...';
+                this.statusItem.tooltip = 'RTL Debugger: Starting';
             } else { // this.sessionState === CXXRTLSessionState.Running
                 if (this.rtlDebugger.simulationStatus === CXXRTLSimulationStatus.Running) {
                     this.statusItem.text = '$(debug-pause) ';
-                    this.statusItem.tooltip = `RTL Debugger: Running`;
+                    this.statusItem.tooltip = 'RTL Debugger: Running';
                 } else if (this.rtlDebugger.simulationStatus === CXXRTLSimulationStatus.Paused) {
                     this.statusItem.text = '$(debug-continue) ';
-                    this.statusItem.tooltip = `RTL Debugger: Paused`;
+                    this.statusItem.tooltip = 'RTL Debugger: Paused';
                 } else if (this.rtlDebugger.simulationStatus === CXXRTLSimulationStatus.Finished) {
                     this.statusItem.text = '';
-                    this.statusItem.tooltip = `RTL Debugger: Finished`;
+                    this.statusItem.tooltip = 'RTL Debugger: Finished';
                 }
                 this.statusItem.text += `${this.rtlDebugger.currentTime} / ${this.rtlDebugger.latestTime}`;
             }
         }
     }
-};
+}

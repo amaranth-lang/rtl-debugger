@@ -55,4 +55,4 @@ export class Location {
         const sourceRelativePath = vscode.workspace.asRelativePath(this.file);
         return `[${sourceRelativePath}:${this.startLine + 1}](${this.asOpenCommandUri()})`;
     }
-};
+}

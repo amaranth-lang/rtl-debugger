@@ -6,7 +6,7 @@ import { TimeInterval, TimePoint } from './model/time';
 import { Scope } from './model/scope';
 import { Variable } from './model/variable';
 import { StatusBarItem } from './ui/status';
-import { BoundReference, Reference, Sample } from './model/sample';
+import { Reference, UnboundReference, Sample } from './model/sample';
 
 export enum CXXRTLSimulationStatus {
     Paused = 'paused',
@@ -28,12 +28,16 @@ export class CXXRTLDebugger {
     // Session properties.
 
     private _sessionStatus: CXXRTLSessionStatus = CXXRTLSessionStatus.Absent;
-    public get sessionStatus() { return this._sessionStatus;}
+    public get sessionStatus() {
+        return this._sessionStatus;
+    }
     private _onDidChangeSessionStatus: vscode.EventEmitter<CXXRTLSessionStatus> = new vscode.EventEmitter<CXXRTLSessionStatus>();
     readonly onDidChangeSessionStatus: vscode.Event<CXXRTLSessionStatus> = this._onDidChangeSessionStatus.event;
 
     private _currentTime: TimePoint = new TimePoint(0n, 0n);
-    public get currentTime() { return this._currentTime;}
+    public get currentTime() {
+        return this._currentTime;
+    }
     private _onDidChangeCurrentTime: vscode.EventEmitter<TimePoint> = new vscode.EventEmitter<TimePoint>();
     readonly onDidChangeCurrentTime: vscode.Event<TimePoint> = this._onDidChangeCurrentTime.event;
 
@@ -42,12 +46,16 @@ export class CXXRTLDebugger {
     private simulationStatusUpdateTimeout: NodeJS.Timeout | null = null;
 
     private _simulationStatus: CXXRTLSimulationStatus = CXXRTLSimulationStatus.Finished;
-    public get simulationStatus() { return this._simulationStatus; }
+    public get simulationStatus() {
+        return this._simulationStatus;
+    }
     private _onDidChangeSimulationStatus: vscode.EventEmitter<CXXRTLSimulationStatus> = new vscode.EventEmitter<CXXRTLSimulationStatus>();
     readonly onDidChangeSimulationStatus: vscode.Event<CXXRTLSimulationStatus> = this._onDidChangeSimulationStatus.event;
 
     private _latestTime: TimePoint = new TimePoint(0n, 0n);
-    public get latestTime() { return this._latestTime;}
+    public get latestTime() {
+        return this._latestTime;
+    }
     private _onDidChangeLatestTime: vscode.EventEmitter<TimePoint> = new vscode.EventEmitter<TimePoint>();
     readonly onDidChangeLatestTime: vscode.Event<TimePoint> = this._onDidChangeLatestTime.event;
 
@@ -63,7 +71,7 @@ export class CXXRTLDebugger {
 
     public async startSession(): Promise<void> {
         if (this.terminal !== null) {
-            vscode.window.showErrorMessage("A debug session is already in the process of being started.");
+            vscode.window.showErrorMessage('A debug session is already in the process of being started.');
             return;
         }
 
@@ -81,24 +89,24 @@ export class CXXRTLDebugger {
             this.setSessionStatus(CXXRTLSessionStatus.Starting);
 
             const processId = await this.terminal.processId;
-            console.log("[RTL Debugger] Launched process %d", processId);
+            console.log('[RTL Debugger] Launched process %d', processId);
 
             setTimeout(() => {
                 const socket = net.createConnection({ port: configuration.port, host: '::1' }, () => {
-                    vscode.window.showInformationMessage("Connected to the CXXRTL server.");
+                    vscode.window.showInformationMessage('Connected to the CXXRTL server.');
 
                     (async () => {
                         this.connection = new Connection(new NodeStreamLink(socket));
                         this.setSessionStatus(CXXRTLSessionStatus.Running);
                         this.updateSimulationStatus();
-                        console.log("[RTL Debugger] Initialized");
+                        console.log('[RTL Debugger] Initialized');
                     })().catch(() => {
                         this.stopSession();
                     });
                 });
                 socket.on('error', (err: any) => {
                     if (err.code === 'ECONNREFUSED') {
-                        vscode.window.showErrorMessage("The connection to the CXXRTL server was refused.");
+                        vscode.window.showErrorMessage('The connection to the CXXRTL server was refused.');
                     } else {
                         vscode.window.showErrorMessage(`The connection to the CXXRTL server has failed: ${err.code}.`);
                     }
@@ -106,14 +114,14 @@ export class CXXRTLDebugger {
                 });
                 socket.on('close', (hadError) => {
                     if (!hadError) {
-                        vscode.window.showInformationMessage("Disconnected from the CXXRTL server.");
+                        vscode.window.showInformationMessage('Disconnected from the CXXRTL server.');
                     }
                     this.stopSession();
                 });
             }, 500); // FIXME
         } else {
-            const OpenSettings = "Open Settings";
-            const selection = await vscode.window.showErrorMessage("Configure the launch command to start a debug session.", OpenSettings);
+            const OpenSettings = 'Open Settings';
+            const selection = await vscode.window.showErrorMessage('Configure the launch command to start a debug session.', OpenSettings);
             if (selection === OpenSettings) {
                 vscode.commands.executeCommand('workbench.action.openSettings', 'rtlDebugger.command');
             }
@@ -254,7 +262,7 @@ export class CXXRTLDebugger {
         for (const [cxxrtlName, cxxrtlDesc] of Object.entries(cxxrtlResponse.scopes)) {
             const nestedScopes: Scope[] = [];
             const nestedVariables: Thenable<Variable[]> = {
-                // NormallyPromises are evaluated eagerly; this Thenable does it lazily.
+                // Normally Promises are evaluated eagerly; this Thenable does it lazily.
                 then: (onfulfilled, onrejected) => {
                     return this.getVariablesForScope(cxxrtlName).then(onfulfilled, onrejected);
                 }
@@ -292,7 +300,7 @@ export class CXXRTLDebugger {
         }
     }
 
-    public bindReference(name: string, reference: Reference): BoundReference {
+    public bindReference(name: string, reference: UnboundReference): Reference {
         const epoch = this.advanceReferenceEpoch(name);
         // Note that we do not wait for the command to complete. Although it is possible for
         // the command to fail, this would only happen if one of the designations is invalid,
@@ -303,13 +311,13 @@ export class CXXRTLDebugger {
             reference: name,
             items: reference.cxxrtlItemDesignations()
         }).catch((error) => {
-            console.error(`[CXXRTL] invalid designation while binding reference`,
+            console.error('[CXXRTL] invalid designation while binding reference',
                 `${name}#${epoch}`, error);
         });
-        return new BoundReference(name, epoch, reference);
+        return new Reference(name, epoch, reference);
     }
 
-    public async queryInterval(interval: TimeInterval, reference: BoundReference): Promise<Sample[]> {
+    public async queryInterval(interval: TimeInterval, reference: Reference): Promise<Sample[]> {
         this.verifyReferenceEpoch(reference.name, reference.epoch);
         const cxxrtlResponse = await this.connection!.queryInterval({
             type: 'command',

@@ -1,30 +1,15 @@
 import * as vscode from 'vscode';
-import { CXXRTLDebugger, CXXRTLSessionStatus } from '../debugger';
+
 import { ModuleScope, Scope } from '../model/scope';
 import { MemoryVariable, ScalarVariable, Variable } from '../model/variable';
-import { DisplayStyle, variableDescription, variableBitIndices, memoryRowIndices } from '../model/styling';
-
-function buildBooleanLikeTreeItem(name: string): vscode.TreeItem {
-    const treeItem = new vscode.TreeItem(name);
-    treeItem.iconPath = new vscode.ThemeIcon('symbol-boolean');
-    return treeItem;
-}
-
-function buildScalarLikeTreeItem(name: string): vscode.TreeItem {
-    const treeItem = new vscode.TreeItem(name, vscode.TreeItemCollapsibleState.Collapsed);
-    treeItem.iconPath = new vscode.ThemeIcon('symbol-variable');
-    return treeItem;
-}
-
-function buildMemoryLikeTreeItem(name: string): vscode.TreeItem {
-    const treeItem = new vscode.TreeItem(name, vscode.TreeItemCollapsibleState.Collapsed);
-    treeItem.iconPath = new vscode.ThemeIcon('symbol-array');
-    return treeItem;
-}
+import { DisplayStyle, variableDescription, variableBitIndices, memoryRowIndices, variableValue, variableTooltip } from '../model/styling';
+import { CXXRTLDebugger, CXXRTLSessionStatus } from '../debugger';
+import { Observer } from '../observer';
+import { Designation, MemoryRangeDesignation, MemoryRowDesignation, ScalarDesignation } from '../model/sample';
 
 abstract class TreeItem {
     constructor(
-        readonly displayStyle: DisplayStyle,
+        readonly provider: TreeDataProvider
     ) {}
 
     abstract getTreeItem(): vscode.TreeItem | Thenable<vscode.TreeItem>;
@@ -32,120 +17,118 @@ abstract class TreeItem {
     getChildren(): vscode.ProviderResult<TreeItem[]> {
         return [];
     }
+
+    get displayStyle(): DisplayStyle {
+        return this.provider.displayStyle;
+    }
+
+    getValue<T>(designation: Designation<T>): T | undefined {
+        return this.provider.getValue(this, designation);
+    }
 }
 
-class VariableTreeItem extends TreeItem {
+class BitTreeItem extends TreeItem {
     constructor(
-        displayStyle: DisplayStyle,
-        readonly variable: Variable,
+        provider: TreeDataProvider,
+        readonly designation: ScalarDesignation | MemoryRowDesignation,
+        readonly bitIndex: number,
     ) {
-        super(displayStyle);
+        super(provider);
+    }
+
+    get variable(): Variable {
+        return this.designation.variable;
     }
 
     override getTreeItem(): vscode.TreeItem {
-        let treeItem;
-        if (this.variable instanceof ScalarVariable) {
-            if (this.variable.width === 1) {
-                treeItem = buildBooleanLikeTreeItem(this.variable.name);
-            } else {
-                treeItem = buildScalarLikeTreeItem(this.variable.name);
-            }
-        } else if (this.variable instanceof MemoryVariable) {
-            treeItem = buildMemoryLikeTreeItem(this.variable.name);
+        const variable = this.designation.variable;
+        const treeItem = new vscode.TreeItem(variable.name);
+        if (this.designation instanceof MemoryRowDesignation) {
+            treeItem.label += `[${this.designation.index}]`;
+        }
+        treeItem.label += `[${this.bitIndex}]`;
+        treeItem.iconPath = new vscode.ThemeIcon('symbol-boolean');
+        const value = this.getValue(this.designation);
+        if (value === undefined) {
+            treeItem.description = '= ...';
         } else {
-            throw new Error(`Unknown variable kind ${this.variable}`);
+            treeItem.description = ((value & (1n << BigInt(this.bitIndex))) !== 0n)
+                ? '= 1'
+                : '= 0';
         }
-        treeItem.description = variableDescription(this.displayStyle, this.variable);
-        treeItem.tooltip = new vscode.MarkdownString(this.variable.fullName.join('.'));
-        treeItem.tooltip.isTrusted = true;
-        if (this.variable.location) {
-            treeItem.tooltip.appendMarkdown(`\n\n- ${this.variable.location.asMarkdownLink()}`);
-            treeItem.command = this.variable.location.asOpenCommand();
+        treeItem.tooltip = variableTooltip(variable);
+        return treeItem;
+    }
+}
+
+class ScalarTreeItem extends TreeItem {
+    constructor(
+        provider: TreeDataProvider,
+        readonly designation: ScalarDesignation | MemoryRowDesignation,
+    ) {
+        super(provider);
+    }
+
+    override getTreeItem(): vscode.TreeItem {
+        const variable = this.designation.variable;
+        const treeItem = new vscode.TreeItem(variable.name);
+        if (this.designation instanceof MemoryRowDesignation) {
+            treeItem.label += `[${this.designation.index}]`;
         }
+        if (variable.width > 1) {
+            treeItem.collapsibleState = vscode.TreeItemCollapsibleState.Collapsed;
+        }
+        treeItem.iconPath = (variable.width === 1)
+            ? new vscode.ThemeIcon('symbol-boolean')
+            : new vscode.ThemeIcon('symbol-variable');
+        const value = this.getValue(this.designation);
+        treeItem.description = variableDescription(this.displayStyle, variable, { scalar: true });
+        treeItem.description += (treeItem.description !== '') ? ' = ' : '= ';
+        treeItem.description += variableValue(this.displayStyle, variable, value);
+        treeItem.tooltip = variableTooltip(variable);
+        treeItem.command = variable.location?.asOpenCommand();
         return treeItem;
     }
 
     override getChildren(): TreeItem[] {
-        const children = [];
-        if (this.variable instanceof ScalarVariable && this.variable.width > 1) {
-            // TODO: Extremely big variables (>1000 bits?) need to be chunked into groups.
-            for (const bitIndex of variableBitIndices(this.displayStyle, this.variable)) {
-                children.push(new ScalarBitTreeItem(this.displayStyle, this.variable, bitIndex));
-            }
-        } else if (this.variable instanceof MemoryVariable) {
-            // TODO: Big memories (>100 rows?) need to be chunked into groups.
-            for (const rowIndex of memoryRowIndices(this.variable))  {
-                children.push(new MemoryRowTreeItem(this.displayStyle, this.variable, rowIndex));
-            }
-        }
-        return children;
+        const variable = this.designation.variable;
+        return Array.from(variableBitIndices(this.displayStyle, variable)).map((index) =>
+            new BitTreeItem(this.provider, this.designation, index));
     }
 }
 
-class ScalarBitTreeItem extends TreeItem {
+class ArrayTreeItem extends TreeItem {
     constructor(
-        displayStyle: DisplayStyle,
-        readonly variable: Variable,
-        readonly bitIndex: number,
+        provider: TreeDataProvider,
+        readonly designation: MemoryRangeDesignation,
     ) {
-        super(displayStyle);
+        super(provider);
     }
 
     override getTreeItem(): vscode.TreeItem {
-        return buildBooleanLikeTreeItem(`${this.variable.name}[${this.bitIndex}]`);
-    }
-}
-
-class MemoryRowTreeItem extends TreeItem {
-    constructor(
-        displayStyle: DisplayStyle,
-        readonly variable: Variable,
-        readonly rowIndex: number,
-    ) {
-        super(displayStyle);
-    }
-
-    override getTreeItem(): vscode.TreeItem {
-        if (this.variable.width === 1) {
-            return buildBooleanLikeTreeItem(`${this.variable.name}[${this.rowIndex}]`);
-        } else {
-            return buildScalarLikeTreeItem(`${this.variable.name}[${this.rowIndex}]`);
-        }
+        const variable = this.designation.variable;
+        const treeItem = new vscode.TreeItem(variable.name);
+        treeItem.collapsibleState = vscode.TreeItemCollapsibleState.Collapsed;
+        treeItem.iconPath = new vscode.ThemeIcon('symbol-array');
+        treeItem.description = variableDescription(this.displayStyle, variable);
+        treeItem.tooltip = variableTooltip(variable);
+        treeItem.command = variable.location?.asOpenCommand();
+        return treeItem;
     }
 
     override getChildren(): TreeItem[] {
-        const children = [];
-        if (this.variable.width > 1) {
-            // TODO: Extremely big variables (>1000 bits?) need to be chunked into groups.
-            for (const bitIndex of variableBitIndices(this.displayStyle, this.variable)) {
-                children.push(new MemoryBitTreeItem(this.displayStyle, this.variable, this.rowIndex, bitIndex));
-            }
-        }
-        return children;
-    }
-}
-
-class MemoryBitTreeItem extends TreeItem {
-    constructor(
-        displayStyle: DisplayStyle,
-        readonly variable: Variable,
-        readonly rowIndex: number,
-        readonly bitIndex: number,
-    ) {
-        super(displayStyle);
-    }
-
-    override getTreeItem(): vscode.TreeItem {
-        return buildBooleanLikeTreeItem(`${this.variable.name}[${this.rowIndex}][${this.bitIndex}]`);
+        const variable = this.designation.variable;
+        return Array.from(memoryRowIndices(variable)).map((index) =>
+            new ScalarTreeItem(this.provider, variable.designation(index)));
     }
 }
 
 class ScopeTreeItem extends TreeItem {
     constructor(
-        displayStyle: DisplayStyle,
+        provider: TreeDataProvider,
         readonly scope: Scope,
     ) {
-        super(displayStyle);
+        super(provider);
     }
 
     override async getTreeItem(): Promise<vscode.TreeItem> {
@@ -176,10 +159,15 @@ class ScopeTreeItem extends TreeItem {
     override async getChildren(): Promise<TreeItem[]> {
         const children = [];
         for (const scope of await this.scope.scopes) {
-            children.push(new ScopeTreeItem(this.displayStyle, scope));
+            children.push(new ScopeTreeItem(this.provider, scope));
         }
         for (const variable of await this.scope.variables) {
-            children.push(new VariableTreeItem(this.displayStyle, variable));
+            if (variable instanceof ScalarVariable) {
+                children.push(new ScalarTreeItem(this.provider, variable.designation()));
+            }
+            if (variable instanceof MemoryVariable) {
+                children.push(new ArrayTreeItem(this.provider, variable.designation()));
+            }
         }
         return children;
     }
@@ -189,20 +177,20 @@ export class TreeDataProvider implements vscode.TreeDataProvider<TreeItem> {
     private _onDidChangeTreeData: vscode.EventEmitter<TreeItem | null> = new vscode.EventEmitter<TreeItem | null>();
     readonly onDidChangeTreeData: vscode.Event<TreeItem | null> = this._onDidChangeTreeData.event;
 
-    constructor(
-        readonly rtlDebugger: CXXRTLDebugger
-    ) {
+    private rtlDebugger: CXXRTLDebugger;
+    private observer: Observer;
+
+    constructor(rtlDebugger: CXXRTLDebugger) {
+        this.rtlDebugger = rtlDebugger;
+        this.observer = new Observer(rtlDebugger, 'sidebar');
+
         vscode.workspace.onDidChangeConfiguration((event) => {
             if (event.affectsConfiguration('rtlDebugger.displayStyle')) {
                 this._onDidChangeTreeData.fire(null);
             }
         });
-        rtlDebugger.onDidChangeSessionStatus((_state) => {
-            this._onDidChangeTreeData.fire(null);
-        });
-        rtlDebugger.onDidChangeCurrentTime((_time) => {
-            this._onDidChangeTreeData.fire(null);
-        });
+        rtlDebugger.onDidChangeSessionStatus((_state) =>
+            this._onDidChangeTreeData.fire(null));
     }
 
     getTreeItem(element: TreeItem): vscode.TreeItem | Thenable<vscode.TreeItem> {
@@ -210,17 +198,29 @@ export class TreeDataProvider implements vscode.TreeDataProvider<TreeItem> {
     }
 
     async getChildren(element?: TreeItem): Promise<TreeItem[] | null | undefined> {
-        if (this.rtlDebugger.sessionStatus !== CXXRTLSessionStatus.Running) {
-            return [];
-        } else if (element !== undefined) {
+        if (element !== undefined) {
             return await element.getChildren();
         } else {
-            const displayStyle = vscode.workspace.getConfiguration('rtlDebugger')
-                .get('displayStyle') as DisplayStyle;
-            const rootScope = await this.rtlDebugger.getRootScope();
-            return [
-                new ScopeTreeItem(displayStyle, rootScope),
-            ];
+            if (this.rtlDebugger.sessionStatus === CXXRTLSessionStatus.Running) {
+                return [
+                    new ScopeTreeItem(this, await this.rtlDebugger.getRootScope()),
+                ];
+            } else {
+                return [];
+            }
         }
+    }
+
+    get displayStyle(): DisplayStyle {
+        const displayStyle = vscode.workspace.getConfiguration('rtlDebugger').get('displayStyle');
+        return displayStyle as DisplayStyle;
+    }
+
+    getValue<T>(element: TreeItem, designation: Designation<T>): T | undefined {
+        this.observer.observe(designation, (_value) => {
+            this._onDidChangeTreeData.fire(element);
+            return false; // one-shot
+        });
+        return this.observer.query(designation);
     }
 }

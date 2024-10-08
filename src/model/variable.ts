@@ -1,4 +1,5 @@
 import * as proto from '../cxxrtl/proto';
+import { MemoryRangeDesignation, MemoryRowDesignation, ScalarDesignation } from './sample';
 import { Location } from './source';
 
 export abstract class Variable {
@@ -43,13 +44,12 @@ export abstract class Variable {
     get cxxrtlIdentifier(): string {
         return this.fullName.join(' ');
     }
-
-    cxxrtlItemDesignation(): proto.ItemDesignation {
-        return [this.cxxrtlIdentifier];
-    }
 }
 
 export class ScalarVariable extends Variable {
+    designation(): ScalarDesignation {
+        return new ScalarDesignation(this);
+    }
 }
 
 export class MemoryVariable extends Variable {
@@ -64,15 +64,17 @@ export class MemoryVariable extends Variable {
         super(fullName, location, lsbAt, width);
     }
 
-    override cxxrtlItemDesignation(): proto.ItemDesignation;
-    override cxxrtlItemDesignation(first: number, last: number): proto.ItemDesignation; // inclusive!
-    override cxxrtlItemDesignation(first: number = 0, last: number = this.depth - 1): proto.ItemDesignation {
-        if (first < 0 || first > this.depth) {
-            throw new RangeError(`Start index ${first} out of range`);
+    designation(index: number): MemoryRowDesignation;
+    designation(first: number, last: number): MemoryRangeDesignation;
+    designation(): MemoryRangeDesignation;
+
+    designation(firstOrIndex?: number, last?: number): MemoryRowDesignation | MemoryRangeDesignation {
+        if (firstOrIndex !== undefined && last === undefined) {
+            return new MemoryRowDesignation(this, firstOrIndex);
+        } else if (firstOrIndex !== undefined && last !== undefined) {
+            return new MemoryRangeDesignation(this, firstOrIndex, last);
+        } else {
+            return new MemoryRangeDesignation(this, 0, this.depth - 1);
         }
-        if (last < 0 || last > this.depth) {
-            throw new RangeError(`End index ${last} out of range`);
-        }
-        return [this.cxxrtlIdentifier, first, last];
     }
 }

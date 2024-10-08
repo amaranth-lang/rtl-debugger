@@ -1,3 +1,5 @@
+import * as vscode from 'vscode';
+
 import { MemoryVariable, ScalarVariable, Variable } from './variable';
 
 export enum DisplayStyle {
@@ -6,14 +8,14 @@ export enum DisplayStyle {
     VHDL = 'VHDL',
 }
 
-export function variableDescription(style: DisplayStyle, variable: Variable): string {
+export function variableDescription(style: DisplayStyle, variable: Variable, { scalar = false } = {}): string {
     let result = '';
     if (variable instanceof ScalarVariable && variable.lsbAt === 0 && variable.width === 1) {
         return result;
     }
     switch (style) {
         case DisplayStyle.Python: {
-            if (variable instanceof MemoryVariable) {
+            if (variable instanceof MemoryVariable && !scalar) {
                 if (variable.zeroAt === 0) {
                     result += `[${variable.depth}] `;
                 } else {
@@ -23,7 +25,7 @@ export function variableDescription(style: DisplayStyle, variable: Variable): st
             if (variable.lsbAt === 0) {
                 result += `[${variable.width}]`;
             } else {
-                result += `[${variable.lsbAt}:${variable.lsbAt + variable.width}]`;
+                result += `[${variable.lsbAt}:${variable.lsbAt + variable.width}] `;
             }
             return result;
         }
@@ -31,8 +33,8 @@ export function variableDescription(style: DisplayStyle, variable: Variable): st
         case DisplayStyle.Verilog:
         case DisplayStyle.VHDL: {
             result += `[${variable.lsbAt + variable.width - 1}:${variable.lsbAt}]`;
-            if (variable instanceof MemoryVariable) {
-                result += ` [${variable.zeroAt}:${variable.zeroAt + variable.depth - 1}]`;
+            if (variable instanceof MemoryVariable && !scalar) {
+                result += ` [${variable.zeroAt}:${variable.zeroAt + variable.depth - 1}] `;
             }
             return result;
         }
@@ -63,8 +65,10 @@ export function* memoryRowIndices(variable: MemoryVariable): Generator<number> {
     }
 }
 
-export function variableValue(style: DisplayStyle, base: 2 | 8 | 10 | 16, variable: Variable, value: bigint): string {
-    if (variable.width === 1) {
+export function variableValue(style: DisplayStyle, variable: Variable, value: bigint | undefined, base: 2 | 8 | 10 | 16 = 10): string {
+    if (value === undefined) {
+        return '...';
+    } else if (variable.width === 1) {
         return value.toString();
     } else {
         switch (style) {
@@ -72,7 +76,7 @@ export function variableValue(style: DisplayStyle, base: 2 | 8 | 10 | 16, variab
                 switch (base) {
                     case 2:  return `0b${value.toString(2)}`;
                     case 8:  return `0o${value.toString(8)}`;
-                    case 10: return `0d${value.toString(10)}`;
+                    case 10: return      value.toString(10);
                     case 16: return `0x${value.toString(16)}`;
                 }
 
@@ -88,4 +92,13 @@ export function variableValue(style: DisplayStyle, base: 2 | 8 | 10 | 16, variab
                 }
         }
     }
+}
+
+export function variableTooltip(variable: Variable): vscode.MarkdownString {
+    const tooltip = new vscode.MarkdownString(variable.fullName.join('.'));
+    tooltip.isTrusted = true;
+    if (variable.location) {
+        tooltip.appendMarkdown(`\n\n- ${variable.location.asMarkdownLink()}`);
+    }
+    return tooltip;
 }

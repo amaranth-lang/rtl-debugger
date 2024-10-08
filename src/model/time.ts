@@ -36,7 +36,7 @@ export class TimePoint {
 
     public toString(): string {
         function groupDecimals(num: bigint) {
-            let groups: string[] = [];
+            const groups: string[] = [];
             if (num === 0n) {
                 groups.push('0');
             } else {

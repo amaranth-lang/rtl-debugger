@@ -3,7 +3,8 @@
     "eslint.useFlatConfig": true,
     "[typescript]": {
         "editor.codeActionsOnSave": {
-            "source.fixAll": "explicit",
+            "source.removeUnusedImports": "always",
+            "source.fixAll.eslint": "always"
         }
     },
 }

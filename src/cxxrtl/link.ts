@@ -9,7 +9,7 @@ export interface ILink {
     onDone: () => Promise<void>;
 
     send(packet: proto.ClientPacket): Promise<void>;
-};
+}
 
 export class MockLink implements ILink {
     constructor(

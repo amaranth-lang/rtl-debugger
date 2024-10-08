@@ -10,20 +10,29 @@ module.exports = [
             'parser': require('@typescript-eslint/parser'),
         },
         'plugins': {
-            '@typescript-eslint': require('@typescript-eslint/eslint-plugin'),
+            '@stylistic': require('@stylistic/eslint-plugin'),
+            '@typescript': require('@typescript-eslint/eslint-plugin'),
         },
         'rules': {
-            'semi': 'error',
             'no-throw-literal': 'error',
+            'semi': 'error',
+            'no-extra-semi': 'error',
+            'eqeqeq': 'error',
+            'prefer-const': 'warn',
             'curly': 'warn',
-            'eqeqeq': 'warn',
-            '@typescript-eslint/naming-convention': [
+            '@typescript/naming-convention': [
                 'warn',
                 {
                     'selector': 'import',
                     'format': [ 'camelCase', 'PascalCase' ]
                 }
             ],
+            '@stylistic/indent': ['warn', 4],
+            '@stylistic/quotes': ['warn', 'single'],
+            '@stylistic/brace-style': ['warn', '1tbs'],
+            '@stylistic/curly-newline': ['warn', {'minElements': 1, 'consistent': true}],
+            '@stylistic/keyword-spacing': 'warn',
+            '@stylistic/space-before-blocks': 'warn',
         },
     }
 ];
