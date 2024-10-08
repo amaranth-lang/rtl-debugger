@@ -1,10 +1,15 @@
 import * as vscode from 'vscode';
-import { CXXRTLDebugger, CXXRTLSimulationStatus } from './debugger';
+import { CXXRTLDebugger } from './debugger';
 import * as sidebar from './ui/sidebar';
+import { inputTime } from './ui/input';
 
 export function activate(context: vscode.ExtensionContext) {
     const rtlDebugger = new CXXRTLDebugger();
     const sidebarTreeDataProvider = new sidebar.TreeDataProvider(rtlDebugger);
+
+    context.subscriptions.push(vscode.window.createTreeView('rtlDebugger.sidebar', {
+        treeDataProvider: sidebarTreeDataProvider
+    }));
 
     vscode.commands.executeCommand('setContext', 'rtlDebugger.sessionStatus', rtlDebugger.sessionStatus);
     context.subscriptions.push(rtlDebugger.onDidChangeSessionStatus((state) =>
@@ -21,32 +26,31 @@ export function activate(context: vscode.ExtensionContext) {
     context.subscriptions.push({ dispose: () => rtlDebugger.stopSession() });
 
     context.subscriptions.push(vscode.commands.registerCommand('rtlDebugger.runSimulation', () =>
-        rtlDebugger.runSimulation()));
-    context.subscriptions.push(vscode.commands.registerCommand('rtlDebugger.runSimulationUntil', () =>
-        rtlDebugger.runSimulationUntil()));
+        rtlDebugger.session!.runSimulation()));
     context.subscriptions.push(vscode.commands.registerCommand('rtlDebugger.pauseSimulation', () =>
-        rtlDebugger.pauseSimulation()));
+        rtlDebugger.session!.pauseSimulation()));
     context.subscriptions.push(vscode.commands.registerCommand('rtlDebugger.runPauseSimulation', () => {
-        if (rtlDebugger.simulationStatus === CXXRTLSimulationStatus.Running) {
-            rtlDebugger.pauseSimulation();
+        if (rtlDebugger.session!.isSimulationRunning) {
+            rtlDebugger.session!.pauseSimulation();
         } else {
-            rtlDebugger.runSimulation();
+            rtlDebugger.session!.runSimulation();
         }
     }));
-
+    context.subscriptions.push(vscode.commands.registerCommand('rtlDebugger.runSimulationUntil', () => {
+        inputTime({ prompt: 'Enter the requested simulation time.' }).then((untilTime) => {
+            if (untilTime !== undefined) {
+                rtlDebugger.session!.runSimulation({ untilTime });
+            }
+        });
+    }));
     context.subscriptions.push(vscode.commands.registerCommand('rtlDebugger.stepBackward', () =>
-        rtlDebugger.stepBackward()));
+        rtlDebugger.session!.stepBackward()));
     context.subscriptions.push(vscode.commands.registerCommand('rtlDebugger.stepForward', () =>
-        rtlDebugger.stepForward()));
+        rtlDebugger.session!.stepForward()));
 
     // For an unknown reason, the `vscode.open` command (which does the exact same thing) ignores the options.
     context.subscriptions.push(vscode.commands.registerCommand('rtlDebugger.openDocument',
         (uri: vscode.Uri, options: vscode.TextDocumentShowOptions) => {
             vscode.window.showTextDocument(uri, options);
         }));
-
-    const cxxrtlSidebarTreeView = vscode.window.createTreeView('rtlDebugger.sidebar', {
-        treeDataProvider: sidebarTreeDataProvider
-    });
-    context.subscriptions.push(cxxrtlSidebarTreeView);
 }

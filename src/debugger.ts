@@ -1,12 +1,8 @@
 import * as net from 'net';
 import * as vscode from 'vscode';
 import { NodeStreamLink } from './cxxrtl/link';
-import { Connection } from './cxxrtl/client';
-import { TimeInterval, TimePoint } from './model/time';
-import { Scope } from './model/scope';
-import { Variable } from './model/variable';
 import { StatusBarItem } from './ui/status';
-import { Reference, UnboundReference, Sample } from './model/sample';
+import { Session } from './debug/session';
 
 export enum CXXRTLSimulationStatus {
     Paused = 'paused',
@@ -23,9 +19,12 @@ export enum CXXRTLSessionStatus {
 export class CXXRTLDebugger {
     private statusBarItem: StatusBarItem;
     private terminal: vscode.Terminal | null = null;
-    private connection: Connection | null = null;
+    public session: Session | null = null;
 
     // Session properties.
+
+    private _onDidChangeSession: vscode.EventEmitter<Session | null> = new vscode.EventEmitter<Session | null>();
+    readonly onDidChangeSession: vscode.Event<Session | null> = this._onDidChangeSession.event;
 
     private _sessionStatus: CXXRTLSessionStatus = CXXRTLSessionStatus.Absent;
     public get sessionStatus() {
@@ -34,16 +33,7 @@ export class CXXRTLDebugger {
     private _onDidChangeSessionStatus: vscode.EventEmitter<CXXRTLSessionStatus> = new vscode.EventEmitter<CXXRTLSessionStatus>();
     readonly onDidChangeSessionStatus: vscode.Event<CXXRTLSessionStatus> = this._onDidChangeSessionStatus.event;
 
-    private _currentTime: TimePoint = new TimePoint(0n, 0n);
-    public get currentTime() {
-        return this._currentTime;
-    }
-    private _onDidChangeCurrentTime: vscode.EventEmitter<TimePoint> = new vscode.EventEmitter<TimePoint>();
-    readonly onDidChangeCurrentTime: vscode.Event<TimePoint> = this._onDidChangeCurrentTime.event;
-
     // Simulation properties.
-
-    private simulationStatusUpdateTimeout: NodeJS.Timeout | null = null;
 
     private _simulationStatus: CXXRTLSimulationStatus = CXXRTLSimulationStatus.Finished;
     public get simulationStatus() {
@@ -52,20 +42,12 @@ export class CXXRTLDebugger {
     private _onDidChangeSimulationStatus: vscode.EventEmitter<CXXRTLSimulationStatus> = new vscode.EventEmitter<CXXRTLSimulationStatus>();
     readonly onDidChangeSimulationStatus: vscode.Event<CXXRTLSimulationStatus> = this._onDidChangeSimulationStatus.event;
 
-    private _latestTime: TimePoint = new TimePoint(0n, 0n);
-    public get latestTime() {
-        return this._latestTime;
-    }
-    private _onDidChangeLatestTime: vscode.EventEmitter<TimePoint> = new vscode.EventEmitter<TimePoint>();
-    readonly onDidChangeLatestTime: vscode.Event<TimePoint> = this._onDidChangeLatestTime.event;
-
     constructor() {
         this.statusBarItem = new StatusBarItem(this);
     }
 
     public dispose() {
         this.statusBarItem.dispose();
-        this._onDidChangeCurrentTime.dispose();
         this._onDidChangeSimulationStatus.dispose();
     }
 
@@ -96,9 +78,15 @@ export class CXXRTLDebugger {
                     vscode.window.showInformationMessage('Connected to the CXXRTL server.');
 
                     (async () => {
-                        this.connection = new Connection(new NodeStreamLink(socket));
+                        this.session = new Session(new NodeStreamLink(socket));
+                        this.session.onDidChangeSimulationStatus((status) => {
+                            this.setSimulationStatus(status.status as CXXRTLSimulationStatus);
+                        });
                         this.setSessionStatus(CXXRTLSessionStatus.Running);
-                        this.updateSimulationStatus();
+                        this._onDidChangeSession.fire(this.session);
+                        this.setSimulationStatus(
+                            this.session.simulationStatus.status as CXXRTLSimulationStatus
+                        );
                         console.log('[RTL Debugger] Initialized');
                     })().catch(() => {
                         this.stopSession();
@@ -129,93 +117,16 @@ export class CXXRTLDebugger {
     }
 
     public stopSession() {
+        this._onDidChangeSession.fire(null);
+
         this.terminal?.dispose();
         this.terminal = null;
 
-        this.connection?.dispose();
-        this.connection = null;
+        this.session?.dispose();
+        this.session = null;
 
         this.setSessionStatus(CXXRTLSessionStatus.Absent);
-        this._currentTime = TimePoint.ZERO;
-
-        this.setSimulationStatus(CXXRTLSimulationStatus.Finished, TimePoint.ZERO);
-    }
-
-    public async stepForward(): Promise<void> {
-        if (this.currentTime.lessThan(this.latestTime)) {
-            this._currentTime = new TimePoint(this.currentTime.secs, this.currentTime.femtos + 1000000n);
-            this._onDidChangeCurrentTime.fire(this.currentTime);
-        }
-    }
-
-    public async stepBackward(): Promise<void> {
-        if (this.currentTime.greaterThan(TimePoint.ZERO)) {
-            this._currentTime = new TimePoint(this.currentTime.secs, this.currentTime.femtos - 1000000n);
-            this._onDidChangeCurrentTime.fire(this.currentTime);
-        }
-    }
-
-    public async runSimulation(): Promise<void> {
-        await this.connection!.runSimulation({
-            type: 'command',
-            command: 'run_simulation',
-            until_time: null,
-            until_diagnostics: [],
-            sample_item_values: true,
-        });
-        await this.updateSimulationStatus();
-    }
-
-    public async runSimulationUntil(): Promise<void> {
-        const untilTime = await vscode.window.showInputBox({
-            placeHolder: '10 ms',
-            prompt: 'Enter the requested simulation time.',
-            validateInput(value) {
-                try {
-                    TimePoint.fromString(value);
-                    return null;
-                } catch (e) {
-                    if (e instanceof SyntaxError) {
-                        return e.message;
-                    } else {
-                        throw e;
-                    }
-                }
-            },
-        });
-        if (untilTime !== undefined) {
-            await this.connection!.runSimulation({
-                type: 'command',
-                command: 'run_simulation',
-                until_time: TimePoint.fromString(untilTime).toCXXRTL(),
-                until_diagnostics: [],
-                sample_item_values: true,
-            });
-            await this.updateSimulationStatus();
-        }
-    }
-
-    public async pauseSimulation(): Promise<void> {
-        const cxxrtlResponse = await this.connection!.pauseSimulation({
-            type: 'command',
-            command: 'pause_simulation',
-        });
-        const latestTime = TimePoint.fromCXXRTL(cxxrtlResponse.time);
-        this.setSimulationStatus(CXXRTLSimulationStatus.Paused, latestTime);
-    }
-
-    private async updateSimulationStatus(): Promise<void> {
-        if (!this.connection) {
-            return;
-        }
-        const cxxrtlResponse = await this.connection.getSimulationStatus({
-            type: 'command',
-            command: 'get_simulation_status',
-        });
-        this.setSimulationStatus(
-            cxxrtlResponse.status as CXXRTLSimulationStatus,
-            TimePoint.fromCXXRTL(cxxrtlResponse.latest_time)
-        );
+        this.setSimulationStatus(CXXRTLSimulationStatus.Finished);
     }
 
     private setSessionStatus(sessionState: CXXRTLSessionStatus): void {
@@ -225,121 +136,10 @@ export class CXXRTLDebugger {
         }
     }
 
-    private setSimulationStatus(simulationState: CXXRTLSimulationStatus, latestTime: TimePoint): void {
+    private setSimulationStatus(simulationState: CXXRTLSimulationStatus): void {
         if (this._simulationStatus !== simulationState) {
             this._simulationStatus = simulationState;
             this._onDidChangeSimulationStatus.fire(simulationState);
         }
-        if (!this._latestTime.equals(latestTime)) {
-            this._latestTime = latestTime;
-            this._onDidChangeLatestTime.fire(latestTime);
-        }
-        if (simulationState === CXXRTLSimulationStatus.Running) {
-            this.simulationStatusUpdateTimeout = setTimeout(() => this.updateSimulationStatus(), 100);
-        } else if (this.simulationStatusUpdateTimeout) {
-            clearTimeout(this.simulationStatusUpdateTimeout);
-            this.simulationStatusUpdateTimeout = null;
-        }
-    }
-
-    private async getVariablesForScope(cxxrtlScopeName: string): Promise<Variable[]> {
-        const cxxrtlResponse = await this.connection!.listItems({
-            type: 'command',
-            command: 'list_items',
-            scope: cxxrtlScopeName,
-        });
-        return Object.entries(cxxrtlResponse.items).map(([cxxrtlName, cxxrtlDesc]) =>
-            Variable.fromCXXRTL(cxxrtlName, cxxrtlDesc));
-    }
-
-    public async getRootScope(): Promise<Scope> {
-        const cxxrtlResponse = await this.connection!.listScopes({
-            type: 'command',
-            command: 'list_scopes',
-        });
-        let rootScope: Scope | undefined;
-        const scopeStack: Scope[][] = [];
-        for (const [cxxrtlName, cxxrtlDesc] of Object.entries(cxxrtlResponse.scopes)) {
-            const nestedScopes: Scope[] = [];
-            const nestedVariables: Thenable<Variable[]> = {
-                // Normally Promises are evaluated eagerly; this Thenable does it lazily.
-                then: (onfulfilled, onrejected) => {
-                    return this.getVariablesForScope(cxxrtlName).then(onfulfilled, onrejected);
-                }
-            };
-            const scope = Scope.fromCXXRTL(cxxrtlName, cxxrtlDesc, nestedScopes, nestedVariables);
-            const scopeName = cxxrtlName === '' ? [] : cxxrtlName.split(' ');
-            while (1 + scopeName.length <= scopeStack.length) {
-                scopeStack.pop();
-            }
-            if (scopeStack.length > 0) {
-                scopeStack.at(-1)!.push(scope);
-            }
-            scopeStack.push(nestedScopes);
-            if (cxxrtlName === '') {
-                rootScope = scope;
-            }
-        }
-        return rootScope!;
-    }
-
-    private readonly referenceEpochs: Map<string, number> = new Map();
-
-    private advanceReferenceEpoch(name: string): number {
-        const epoch = (this.referenceEpochs.get(name) || 0) + 1;
-        this.referenceEpochs.set(name, epoch);
-        return epoch;
-    }
-
-    private verifyReferenceEpoch(name: string, requestedEpoch: number) {
-        const currentEpoch = this.referenceEpochs.get(name);
-        if (currentEpoch !== requestedEpoch) {
-            throw new ReferenceError(
-                `Querying out-of-date reference ${name}#${requestedEpoch}; ` +
-                `the current binding is ${name}#${currentEpoch}`);
-        }
-    }
-
-    public bindReference(name: string, reference: UnboundReference): Reference {
-        const epoch = this.advanceReferenceEpoch(name);
-        // Note that we do not wait for the command to complete. Although it is possible for
-        // the command to fail, this would only happen if one of the designations is invalid,
-        // which should never happen absent bugs. We still report the error in that case.
-        this.connection!.referenceItems({
-            type: 'command',
-            command: 'reference_items',
-            reference: name,
-            items: reference.cxxrtlItemDesignations()
-        }).catch((error) => {
-            console.error('[CXXRTL] invalid designation while binding reference',
-                `${name}#${epoch}`, error);
-        });
-        return new Reference(name, epoch, reference);
-    }
-
-    public async queryInterval(interval: TimeInterval, reference: Reference): Promise<Sample[]> {
-        this.verifyReferenceEpoch(reference.name, reference.epoch);
-        const cxxrtlResponse = await this.connection!.queryInterval({
-            type: 'command',
-            command: 'query_interval',
-            interval: interval.toCXXRTL(),
-            collapse: true,
-            items: reference.name,
-            item_values_encoding: 'base64(u32)',
-            diagnostics: false
-        });
-        return cxxrtlResponse.samples.map((cxxrtlSample) => {
-            const itemValuesBuffer = Buffer.from(cxxrtlSample.item_values!, 'base64');
-            const itemValuesArray = new Uint32Array(
-                itemValuesBuffer.buffer,
-                itemValuesBuffer.byteOffset,
-                itemValuesBuffer.length / Uint32Array.BYTES_PER_ELEMENT
-            );
-            return new Sample(
-                TimePoint.fromCXXRTL(cxxrtlSample.time),
-                reference.unbound,
-                itemValuesArray
-            );
-        });
     }
 }

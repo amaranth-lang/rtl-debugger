@@ -1,8 +1,8 @@
 import * as vscode from 'vscode';
 
-import { UnboundReference, Designation, Reference } from './model/sample';
-import { CXXRTLDebugger } from './debugger';
-import { TimeInterval } from './model/time';
+import { UnboundReference, Designation, Reference } from '../model/sample';
+import { TimeInterval } from '../model/time';
+import { Session } from './session';
 
 class Observable<T> {
     private callbacks: ((value: T) => void)[] = [];
@@ -42,14 +42,15 @@ export class Observer {
     private subscription: vscode.Disposable;
 
     constructor(
-        private rtlDebugger: CXXRTLDebugger,
+        private session: Session,
         private referenceName: string,
     ) {
-        this.subscription = rtlDebugger.onDidChangeCurrentTime((_time) =>
+        this.subscription = this.session.onDidChangeTimeCursor((_time) =>
             this.invalidate());
     }
 
     dispose() {
+        this.observables.clear();
         this.subscription.dispose();
     }
 
@@ -84,11 +85,11 @@ export class Observer {
                 for (const observable of this.observables.values()) {
                     unboundReference.add(observable.designation);
                 }
-                this.reference = this.rtlDebugger.bindReference(this.referenceName, unboundReference);
+                this.reference = this.session.bindReference(this.referenceName, unboundReference);
             }
-            const interval = new TimeInterval(this.rtlDebugger.currentTime, this.rtlDebugger.currentTime);
+            const interval = new TimeInterval(this.session.timeCursor, this.session.timeCursor);
             const reference = this.reference; // could get invalidated in the meantime
-            const [sample] = await this.rtlDebugger.queryInterval(interval, reference);
+            const [sample] = await this.session.queryInterval(interval, reference);
             for (const [designation, handle] of reference.allHandles()) {
                 const observable = this.observables.get(designation.canonicalKey)!;
                 observable.update(sample.extract(handle));

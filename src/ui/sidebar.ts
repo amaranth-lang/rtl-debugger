@@ -3,9 +3,10 @@ import * as vscode from 'vscode';
 import { ModuleScope, Scope } from '../model/scope';
 import { MemoryVariable, ScalarVariable, Variable } from '../model/variable';
 import { DisplayStyle, variableDescription, variableBitIndices, memoryRowIndices, variableValue, variableTooltip } from '../model/styling';
-import { CXXRTLDebugger, CXXRTLSessionStatus } from '../debugger';
-import { Observer } from '../observer';
+import { CXXRTLDebugger } from '../debugger';
+import { Observer } from '../debug/observer';
 import { Designation, MemoryRangeDesignation, MemoryRowDesignation, ScalarDesignation } from '../model/sample';
+import { Session } from '../debug/session';
 
 abstract class TreeItem {
     constructor(
@@ -177,20 +178,25 @@ export class TreeDataProvider implements vscode.TreeDataProvider<TreeItem> {
     private _onDidChangeTreeData: vscode.EventEmitter<TreeItem | null> = new vscode.EventEmitter<TreeItem | null>();
     readonly onDidChangeTreeData: vscode.Event<TreeItem | null> = this._onDidChangeTreeData.event;
 
-    private rtlDebugger: CXXRTLDebugger;
-    private observer: Observer;
+    private session: Session | null = null;
+    private observer: Observer | null = null;
 
     constructor(rtlDebugger: CXXRTLDebugger) {
-        this.rtlDebugger = rtlDebugger;
-        this.observer = new Observer(rtlDebugger, 'sidebar');
-
         vscode.workspace.onDidChangeConfiguration((event) => {
             if (event.affectsConfiguration('rtlDebugger.displayStyle')) {
                 this._onDidChangeTreeData.fire(null);
             }
         });
-        rtlDebugger.onDidChangeSessionStatus((_state) =>
-            this._onDidChangeTreeData.fire(null));
+        rtlDebugger.onDidChangeSession((session) => {
+            this.session = session;
+            if (session !== null) {
+                this.observer = new Observer(session, 'sidebar');
+            } else {
+                this.observer?.dispose();
+                this.observer = null;
+            }
+            this._onDidChangeTreeData.fire(null);
+        });
     }
 
     getTreeItem(element: TreeItem): vscode.TreeItem | Thenable<vscode.TreeItem> {
@@ -200,14 +206,13 @@ export class TreeDataProvider implements vscode.TreeDataProvider<TreeItem> {
     async getChildren(element?: TreeItem): Promise<TreeItem[] | null | undefined> {
         if (element !== undefined) {
             return await element.getChildren();
+        }
+        if (this.session !== null) {
+            return [
+                new ScopeTreeItem(this, await this.session.getRootScope()),
+            ];
         } else {
-            if (this.rtlDebugger.sessionStatus === CXXRTLSessionStatus.Running) {
-                return [
-                    new ScopeTreeItem(this, await this.rtlDebugger.getRootScope()),
-                ];
-            } else {
-                return [];
-            }
+            return [];
         }
     }
 
@@ -217,6 +222,9 @@ export class TreeDataProvider implements vscode.TreeDataProvider<TreeItem> {
     }
 
     getValue<T>(element: TreeItem, designation: Designation<T>): T | undefined {
+        if (this.observer === null) {
+            return;
+        }
         this.observer.observe(designation, (_value) => {
             this._onDidChangeTreeData.fire(element);
             return false; // one-shot

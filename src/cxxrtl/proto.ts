@@ -101,6 +101,10 @@ export type ScopeDescriptionModule = {
 export type ScopeDescription =
 | ScopeDescriptionModule;
 
+export type ScopeDescriptionMap = {
+    [identifier: string]: ScopeDescription
+};
+
 export type CommandListScopes = {
     type: 'command';
     command: 'list_scopes';
@@ -109,9 +113,7 @@ export type CommandListScopes = {
 export type ResponseListScopes = {
     type: 'response';
     command: 'list_scopes';
-    scopes: {
-        [identifier: string]: ScopeDescription;
-    };
+    scopes: ScopeDescriptionMap;
 };
 
 // ## Command: List Items
@@ -142,6 +144,10 @@ export type ItemDescription =
 | ItemDescriptionNode
 | ItemDescriptionMemory;
 
+export type ItemDescriptionMap = {
+    [identifier: string]: ItemDescription
+};
+
 export type CommandListItems = {
     type: 'command';
     command: 'list_items';
@@ -151,9 +157,7 @@ export type CommandListItems = {
 export type ResponseListItems = {
     type: 'response';
     command: 'list_items';
-    items: {
-        [identifier: string]: ItemDescription;
-    };
+    items: ItemDescriptionMap;
 };
 
 // ## Command: Reference Items
@@ -201,8 +205,8 @@ export type CommandQueryInterval = {
     command: 'query_interval';
     interval: [TimePoint, TimePoint];
     collapse: boolean;
-    items: string;
-    item_values_encoding: string;
+    items: string | null;
+    item_values_encoding: string | null;
     diagnostics: boolean;
 };
 

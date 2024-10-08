@@ -30,8 +30,12 @@ export class TimePoint {
         return this.#raw < other.#raw;
     }
 
-    public oneMomentLater(): TimePoint {
-        return new TimePoint(this.secs, this.femtos + 1n);
+    public offsetByFemtos(femtos: bigint): TimePoint {
+        return new TimePoint(this.secs, this.femtos + femtos);
+    }
+
+    public differenceInFemtos(other: TimePoint): bigint {
+        return this.#raw - other.#raw;
     }
 
     public toString(): string {
