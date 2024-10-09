@@ -108,6 +108,7 @@ export type ScopeDescriptionMap = {
 export type CommandListScopes = {
     type: 'command';
     command: 'list_scopes';
+    scope: null | string;
 };
 
 export type ResponseListScopes = {

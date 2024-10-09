@@ -64,8 +64,8 @@ export class Session {
         if (scopeDescriptionMap === undefined) {
             const response = await this.connection.listScopes({
                 type: 'command',
-                command: 'list_scopes'
-                // FIXME: should be possible to filter by scope, too
+                command: 'list_scopes',
+                scope: scopeIdentifier,
             });
             const filteredScopes = Object.keys(response.scopes).filter((scopeName) => {
                 if (scopeIdentifier === '') {
@@ -104,7 +104,8 @@ export class Session {
         if (this.rootScopeDesc === undefined) {
             const response = await this.connection.listScopes({
                 type: 'command',
-                command: 'list_scopes'
+                command: 'list_scopes',
+                scope: scopeName,
             });
             this.rootScopeDesc = response.scopes[scopeName];
         }
