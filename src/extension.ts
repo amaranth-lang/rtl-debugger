@@ -39,17 +39,26 @@ export function activate(context: vscode.ExtensionContext) {
             rtlDebugger.session!.runSimulation();
         }
     }));
-    context.subscriptions.push(vscode.commands.registerCommand('rtlDebugger.runSimulationUntil', () => {
-        inputTime({ prompt: 'Enter the requested simulation time.' }).then((untilTime) => {
-            if (untilTime !== undefined) {
-                rtlDebugger.session!.runSimulation({ untilTime });
-            }
-        });
+    context.subscriptions.push(vscode.commands.registerCommand('rtlDebugger.runSimulationUntil', async () => {
+        const untilTime = await inputTime({ prompt: 'Enter the time to simulate until.' });
+        if (untilTime !== undefined) {
+            rtlDebugger.session!.runSimulation({ untilTime });
+        }
     }));
     context.subscriptions.push(vscode.commands.registerCommand('rtlDebugger.stepBackward', () =>
         rtlDebugger.session!.stepBackward()));
     context.subscriptions.push(vscode.commands.registerCommand('rtlDebugger.stepForward', () =>
         rtlDebugger.session!.stepForward()));
+    context.subscriptions.push(vscode.commands.registerCommand('rtlDebugger.goToTime', async () => {
+        const goToTime = await inputTime({ prompt: 'Enter the time to examine the state at.' });
+        if (goToTime !== undefined) {
+            if (rtlDebugger.session!.simulationStatus.latestTime.lessThan(goToTime)) {
+                vscode.window.showErrorMessage(`The simulation has not advanced to ${goToTime} yet.`);
+            } else {
+                rtlDebugger.session!.timeCursor = goToTime;
+            }
+        }
+    }));
 
     context.subscriptions.push(vscode.commands.registerCommand('rtlDebugger.setRadix.2', (treeItem) =>
         globalVariableOptions.update(treeItem.designation.variable.cxxrtlIdentifier, { radix: 2 })));

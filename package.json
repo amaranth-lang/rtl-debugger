@@ -129,6 +129,11 @@
         "icon": "$(debug-step-back)"
       },
       {
+        "command": "rtlDebugger.goToTime",
+        "category": "RTL Debugger",
+        "title": "Go to Time..."
+      },
+      {
         "command": "rtlDebugger.setRadix.2",
         "category": "RTL Debugger",
         "title": "Use Radix 2"
@@ -218,6 +223,10 @@
         },
         {
           "command": "rtlDebugger.stepBackward",
+          "when": "rtlDebugger.sessionStatus == running"
+        },
+        {
+          "command": "rtlDebugger.goToTime",
           "when": "rtlDebugger.sessionStatus == running"
         }
       ],
