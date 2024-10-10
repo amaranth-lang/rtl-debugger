@@ -91,7 +91,12 @@ export function variableValue(style: DisplayStyle, variable: Variable, value: bi
                 }
 
             case DisplayStyle.Verilog:
-                return `${radix}'${value.toString(radix)}`;
+                switch (radix) {
+                    case 2:  return `${variable.width}'b${value.toString(2)}`;
+                    case 8:  return `${variable.width}'o${value.toString(8)}`;
+                    case 10: return `${variable.width}'d${value.toString(10)}`;
+                    case 16: return `${variable.width}'h${value.toString(16)}`;
+                }
 
             case DisplayStyle.VHDL:
                 switch (radix) {
