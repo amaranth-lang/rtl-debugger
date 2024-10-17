@@ -1,6 +1,8 @@
 # RTL Debugger for VSCode
 
-TODO
+This is a VS Code plugin that allows the debugging of RTL code, with waveform analysis, asserts and breakpoints.
+
+It primarily supports Amaranth and Verilog
 
 ## Features
 
