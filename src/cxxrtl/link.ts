@@ -79,26 +79,32 @@ export class NodeStreamLink implements ILink {
             this.recvBuffer.splice(0, this.recvBuffer.length, rest.at(-1)!);
         }
 
-        // Second, process the packets. This involves steps that may throw errors, so we catch
-        // them all. Also, the stream is paused so that this event handler isn't re-entered despite
-        // using `await` here.
-        this.stream.pause();
+        // Second, convert the packet text to JSON. This can throw errors e.g. if there is foreign
+        // data injected between server replies, or the server is malfunctioning. In that case,
+        // stop processing input.
+        const packets: proto.ServerPacket[] = [];
         for (const packetText of packetTexts) {
             try {
-                const packet = JSON.parse(packetText) as proto.ServerPacket;
-                try {
-                    await this.onRecv(packet);
-                    this.stream.resume();
-                } catch (error) {
-                    console.error('uncaught error in onRecv', error);
-                    return; // leave paused
-                }
+                packets.push(JSON.parse(packetText) as proto.ServerPacket);
             } catch (error) {
                 console.error('malformed JSON: ', packetText);
-                return; // leave paused
+                this.stream.pause();
+                return;
             }
         }
-        this.stream.resume();
+
+        // Finally, run the handler for each of the packets. If the handler blocks, don't wait for
+        // its completion, but run the next handler anyway; this is because a handler can send
+        // another client packet, causing `onStreamData` to be re-entered, anyway.
+        for (const packet of packets) {
+            (async (packet: proto.ServerPacket) => {
+                try {
+                    await this.onRecv(packet);
+                } catch (error) {
+                    console.error('uncaught error in onRecv', error);
+                }
+            })(packet);
+        }
     }
 
     private async onStreamEnd(): Promise<void> {
