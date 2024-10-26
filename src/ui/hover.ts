@@ -7,7 +7,7 @@ import { DisplayStyle, languageForDisplayStyle, variableDescription, variableVal
 import { Session } from '../debug/session';
 
 export class HoverProvider implements vscode.HoverProvider {
-    static readonly SUPPORTED_LANGUAGES: string[] = ['verilog'];
+    static readonly SUPPORTED_LANGUAGES: string[] = ['verilog', 'systemverilog'];
 
     constructor(
         private rtlDebugger: CXXRTLDebugger
