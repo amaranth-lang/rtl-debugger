@@ -1,9 +1,9 @@
 import * as vscode from 'vscode';
-import { globalWatchList } from './debug/watch';
 import { CXXRTLDebugger } from './debugger';
 import * as sidebar from './ui/sidebar';
-import { inputTime } from './ui/input';
+import { globalWatchList } from './debug/watch';
 import { globalVariableOptions } from './debug/options';
+import { inputTime } from './ui/input';
 
 export function activate(context: vscode.ExtensionContext) {
     const rtlDebugger = new CXXRTLDebugger();

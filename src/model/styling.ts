@@ -81,29 +81,36 @@ export function variableValue(style: DisplayStyle, variable: Variable, value: bi
         if (radix === undefined) {
             radix = globalVariableOptions.get(variable.cxxrtlIdentifier).radix ?? 10;
         }
+        let stringValue;
+        switch (radix) {
+            case 2:  stringValue = value.toString(2) .padStart(variable.width / 1, '0');
+            case 8:  stringValue = value.toString(8) .padStart(variable.width / 3, '0');
+            case 10: stringValue = value.toString(10);
+            case 16: stringValue = value.toString(16).padStart(variable.width / 4, '0');
+        }
         switch (style) {
             case DisplayStyle.Python:
                 switch (radix) {
-                    case 2:  return `0b${value.toString(2)}`;
-                    case 8:  return `0o${value.toString(8)}`;
-                    case 10: return      value.toString(10);
-                    case 16: return `0x${value.toString(16)}`;
+                    case 2:  return `0b${stringValue}`;
+                    case 8:  return `0o${stringValue}`;
+                    case 10: return      stringValue;
+                    case 16: return `0x${stringValue}`;
                 }
 
             case DisplayStyle.Verilog:
                 switch (radix) {
-                    case 2:  return `${variable.width}'b${value.toString(2)}`;
-                    case 8:  return `${variable.width}'o${value.toString(8)}`;
-                    case 10: return `${variable.width}'d${value.toString(10)}`;
-                    case 16: return `${variable.width}'h${value.toString(16)}`;
+                    case 2:  return `${variable.width}'b${stringValue}`;
+                    case 8:  return `${variable.width}'o${stringValue}`;
+                    case 10: return `${variable.width}'d${stringValue}`;
+                    case 16: return `${variable.width}'h${stringValue}`;
                 }
 
             case DisplayStyle.VHDL:
                 switch (radix) {
-                    case 2:  return `B"${value.toString(2)}"`;
-                    case 8:  return `O"${value.toString(8)}"`;
-                    case 10: return      value.toString(10);
-                    case 16: return `X"${value.toString(16)}"`;
+                    case 2:  return `B"${stringValue}"`;
+                    case 8:  return `O"${stringValue}"`;
+                    case 10: return      stringValue;
+                    case 16: return `X"${stringValue}"`;
                 }
         }
     }
