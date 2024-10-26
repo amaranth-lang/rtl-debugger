@@ -40,7 +40,7 @@ export class Connection {
         });
     }
 
-    public dispose(): void {
+    dispose(): void {
         this.link.dispose();
     }
 
@@ -126,53 +126,53 @@ export class Connection {
         });
     }
 
-    public async onConnected(): Promise<void> {}
+    async onConnected(): Promise<void> {}
 
-    public async onDisconnected(): Promise<void> {}
+    async onDisconnected(): Promise<void> {}
 
-    public async onEvent(_event: proto.AnyEvent): Promise<void> {}
+    async onEvent(_event: proto.AnyEvent): Promise<void> {}
 
-    public get state(): ConnectionState {
+    get state(): ConnectionState {
         return this._state;
     }
 
-    public get commands(): string[] {
+    get commands(): string[] {
         return this._commands.slice();
     }
 
-    public get events(): string[] {
+    get events(): string[] {
         return this._events.slice();
     }
 
-    public get itemValuesEncodings(): string[] {
+    get itemValuesEncodings(): string[] {
         return this._itemValuesEncodings.slice();
     }
 
-    public async listScopes(command: proto.CommandListScopes): Promise<proto.ResponseListScopes> {
+    async listScopes(command: proto.CommandListScopes): Promise<proto.ResponseListScopes> {
         return await this.perform(command) as proto.ResponseListScopes;
     }
 
-    public async listItems(command: proto.CommandListItems): Promise<proto.ResponseListItems> {
+    async listItems(command: proto.CommandListItems): Promise<proto.ResponseListItems> {
         return await this.perform(command) as proto.ResponseListItems;
     }
 
-    public async referenceItems(command: proto.CommandReferenceItems): Promise<proto.ResponseReferenceItems> {
+    async referenceItems(command: proto.CommandReferenceItems): Promise<proto.ResponseReferenceItems> {
         return await this.perform(command) as proto.ResponseReferenceItems;
     }
 
-    public async queryInterval(command: proto.CommandQueryInterval): Promise<proto.ResponseQueryInterval> {
+    async queryInterval(command: proto.CommandQueryInterval): Promise<proto.ResponseQueryInterval> {
         return await this.perform(command) as proto.ResponseQueryInterval;
     }
 
-    public async getSimulationStatus(command: proto.CommandGetSimulationStatus): Promise<proto.ResponseGetSimulationStatus> {
+    async getSimulationStatus(command: proto.CommandGetSimulationStatus): Promise<proto.ResponseGetSimulationStatus> {
         return await this.perform(command) as proto.ResponseGetSimulationStatus;
     }
 
-    public async runSimulation(command: proto.CommandRunSimulation): Promise<proto.ResponseRunSimulation> {
+    async runSimulation(command: proto.CommandRunSimulation): Promise<proto.ResponseRunSimulation> {
         return await this.perform(command) as proto.ResponseRunSimulation;
     }
 
-    public async pauseSimulation(command: proto.CommandPauseSimulation): Promise<proto.ResponsePauseSimulation> {
+    async pauseSimulation(command: proto.CommandPauseSimulation): Promise<proto.ResponsePauseSimulation> {
         return await this.perform(command) as proto.ResponsePauseSimulation;
     }
 }

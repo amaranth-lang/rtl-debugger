@@ -10,35 +10,35 @@ export class TimePoint {
         this.#raw = secs * TimePoint.RESOLUTION + femtos;
     }
 
-    public get secs(): bigint {
+    get secs(): bigint {
         return this.#raw / TimePoint.RESOLUTION;
     }
 
-    public get femtos(): bigint {
+    get femtos(): bigint {
         return this.#raw % TimePoint.RESOLUTION;
     }
 
-    public equals(other: TimePoint): boolean {
+    equals(other: TimePoint): boolean {
         return this.#raw === other.#raw;
     }
 
-    public greaterThan(other: TimePoint): boolean {
+    greaterThan(other: TimePoint): boolean {
         return this.#raw > other.#raw;
     }
 
-    public lessThan(other: TimePoint): boolean {
+    lessThan(other: TimePoint): boolean {
         return this.#raw < other.#raw;
     }
 
-    public offsetByFemtos(femtos: bigint): TimePoint {
+    offsetByFemtos(femtos: bigint): TimePoint {
         return new TimePoint(this.secs, this.femtos + femtos);
     }
 
-    public differenceInFemtos(other: TimePoint): bigint {
+    differenceInFemtos(other: TimePoint): bigint {
         return this.#raw - other.#raw;
     }
 
-    public toString(): string {
+    toString(): string {
         function groupDecimals(num: bigint) {
             const groups: string[] = [];
             if (num === 0n) {
@@ -70,7 +70,7 @@ export class TimePoint {
         }
     }
 
-    public static fromString(value: string): TimePoint {
+    static fromString(value: string): TimePoint {
         const matches = value.match(/^(\d+)\s*(s|ms|us|ns|ps|fs)$/);
         if (matches === null) {
             throw new SyntaxError(`${JSON.stringify(value)} is not a valid time point`);
@@ -94,7 +94,7 @@ export class TimePoint {
         }
     }
 
-    public static fromCXXRTL(value: string): TimePoint {
+    static fromCXXRTL(value: string): TimePoint {
         const matches = value.match(/^(\d+)\.(\d+)$/);
         if (matches === null) {
             throw new SyntaxError(`${JSON.stringify(value)} is not a valid time point`);
@@ -102,7 +102,7 @@ export class TimePoint {
         return new TimePoint(BigInt(matches[1]), BigInt(matches[2]));
     }
 
-    public toCXXRTL(): string {
+    toCXXRTL(): string {
         return `${this.secs.toString()}.${this.femtos.toString().padStart(15, '0')}`;
     }
 }
@@ -110,11 +110,11 @@ export class TimePoint {
 export class TimeInterval {
     constructor(public begin: TimePoint, public end: TimePoint) {}
 
-    public static fromCXXRTL([begin, end]: [string, string]): TimeInterval {
+    static fromCXXRTL([begin, end]: [string, string]): TimeInterval {
         return new TimeInterval(TimePoint.fromCXXRTL(begin), TimePoint.fromCXXRTL(end));
     }
 
-    public toCXXRTL(): [string, string] {
+    toCXXRTL(): [string, string] {
         return [this.begin.toCXXRTL(), this.end.toCXXRTL()];
     }
 }

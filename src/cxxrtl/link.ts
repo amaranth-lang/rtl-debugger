@@ -16,17 +16,17 @@ export class MockLink implements ILink {
         private conversation: [proto.ClientPacket, proto.ServerPacket | proto.ServerPacket[]][]
     ) {}
 
-    public dispose(): void {
+    dispose(): void {
         if (this.conversation.length !== 0) {
             throw new Error('disposed of before end of conversation');
         }
     }
 
-    public async onRecv(_serverPacket: proto.ServerPacket): Promise<void> {}
+    async onRecv(_serverPacket: proto.ServerPacket): Promise<void> {}
 
-    public async onDone(): Promise<void> {}
+    async onDone(): Promise<void> {}
 
-    public async send(clientPacket: proto.ClientPacket): Promise<void> {
+    async send(clientPacket: proto.ClientPacket): Promise<void> {
         if (this.conversation.length === 0) {
             throw new Error('premature end of conversation');
         }
@@ -109,15 +109,15 @@ export class NodeStreamLink implements ILink {
         }
     }
 
-    public dispose(): void {
+    dispose(): void {
         this.stream.destroy();
     }
 
-    public async onRecv(_serverPacket: proto.ServerPacket): Promise<void> {}
+    async onRecv(_serverPacket: proto.ServerPacket): Promise<void> {}
 
-    public async onDone(): Promise<void> {}
+    async onDone(): Promise<void> {}
 
-    public async send(clientPacket: proto.ClientPacket): Promise<void> {
+    async send(clientPacket: proto.ClientPacket): Promise<void> {
         this.stream.write(JSON.stringify(clientPacket) + '\0');
     }
 }

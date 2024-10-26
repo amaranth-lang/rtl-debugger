@@ -19,7 +19,7 @@ export enum CXXRTLSessionStatus {
 export class CXXRTLDebugger {
     private statusBarItem: StatusBarItem;
     private terminal: vscode.Terminal | null = null;
-    public session: Session | null = null;
+    session: Session | null = null;
 
     // Session properties.
 
@@ -27,7 +27,7 @@ export class CXXRTLDebugger {
     readonly onDidChangeSession: vscode.Event<Session | null> = this._onDidChangeSession.event;
 
     private _sessionStatus: CXXRTLSessionStatus = CXXRTLSessionStatus.Absent;
-    public get sessionStatus() {
+    get sessionStatus() {
         return this._sessionStatus;
     }
     private _onDidChangeSessionStatus: vscode.EventEmitter<CXXRTLSessionStatus> = new vscode.EventEmitter<CXXRTLSessionStatus>();
@@ -36,7 +36,7 @@ export class CXXRTLDebugger {
     // Simulation properties.
 
     private _simulationStatus: CXXRTLSimulationStatus = CXXRTLSimulationStatus.Finished;
-    public get simulationStatus() {
+    get simulationStatus() {
         return this._simulationStatus;
     }
     private _onDidChangeSimulationStatus: vscode.EventEmitter<CXXRTLSimulationStatus> = new vscode.EventEmitter<CXXRTLSimulationStatus>();
@@ -46,12 +46,12 @@ export class CXXRTLDebugger {
         this.statusBarItem = new StatusBarItem(this);
     }
 
-    public dispose() {
+    dispose() {
         this.statusBarItem.dispose();
         this._onDidChangeSimulationStatus.dispose();
     }
 
-    public async startSession(): Promise<void> {
+    async startSession(): Promise<void> {
         if (this.terminal !== null) {
             vscode.window.showErrorMessage('A debug session is already in the process of being started.');
             return;
@@ -116,7 +116,7 @@ export class CXXRTLDebugger {
         }
     }
 
-    public stopSession() {
+    stopSession() {
         this._onDidChangeSession.fire(null);
 
         this.terminal?.dispose();
