@@ -161,6 +161,7 @@ class ScopeTreeItem extends TreeItem {
     constructor(
         provider: TreeDataProvider,
         readonly scope: Scope,
+        readonly hasSiblings: boolean,
     ) {
         super(provider);
     }
@@ -183,19 +184,23 @@ class ScopeTreeItem extends TreeItem {
                 }
                 treeItem.command = this.scope.location.asOpenCommand();
             }
-            if ((await this.scope.scopes).length > 0 || (await this.scope.variables).length > 0) {
-                treeItem.collapsibleState = vscode.TreeItemCollapsibleState.Collapsed;
+            const [subScopes, variables] = await Promise.all([this.scope.scopes, this.scope.variables]);
+            if (subScopes.length > 0 || variables.length > 0) {
+                treeItem.collapsibleState = this.hasSiblings ?
+                    vscode.TreeItemCollapsibleState.Collapsed :
+                    vscode.TreeItemCollapsibleState.Expanded;
             }
             return treeItem;
         }
     }
 
     override async getChildren(): Promise<TreeItem[]> {
+        const [subScopes, variables] = await Promise.all([this.scope.scopes, this.scope.variables]);
         const children = [];
-        for (const scope of await this.scope.scopes) {
-            children.push(new ScopeTreeItem(this.provider, scope));
+        for (const scope of subScopes) {
+            children.push(new ScopeTreeItem(this.provider, scope, subScopes.length > 1));
         }
-        for (const variable of await this.scope.variables) {
+        for (const variable of variables) {
             if (variable instanceof ScalarVariable) {
                 children.push(new ScalarTreeItem(this.provider, variable.designation(),
                     variable.width > 1 ? 'canWatch|canSetRadix' : 'canWatch'));
@@ -281,7 +286,7 @@ export class TreeDataProvider implements vscode.TreeDataProvider<TreeItem> {
             if (session !== null) {
                 this.observer = new Observer(session, 'sidebar');
                 this.watchTreeItem = new WatchTreeItem(this);
-                this.scopeTreeItem = new ScopeTreeItem(this, await session.getRootScope());
+                this.scopeTreeItem = new ScopeTreeItem(this, await session.getRootScope(), false);
             } else {
                 this.observer?.dispose();
                 this.observer = null;

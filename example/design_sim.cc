@@ -13,7 +13,7 @@ int main(int argc, char **argv) {
   }
 
   cxxrtl_design::p_top top;
-  cxxrtl::agent<cxxrtl_design::p_top> agent(cxxrtl::spool("spool.bin"), top);
+  cxxrtl::agent<cxxrtl_design::p_top> agent(cxxrtl::spool("spool.bin"), top, "top ");
 
   std::string uri = agent.start_debugging(cxxrtl::tcp_link());
   fprintf(stderr, "Simulation started on %s\n", uri.c_str());

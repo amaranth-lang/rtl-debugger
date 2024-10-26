@@ -108,6 +108,23 @@ export class Session {
                 scope: scopeName,
             });
             this.rootScopeDesc = response.scopes[scopeName];
+            if (this.rootScopeDesc === undefined) {
+                // This can happen if the root scope has never been defined anywhere, i.e. if it
+                // is synthesized for the simulation, e.g. by passing `"top "` as the last argument
+                // to the CXXRTL agent constructor.
+                this.rootScopeDesc = {
+                    type: 'module',
+                    definition: {
+                        src: null,
+                        name: null,
+                        attributes: {}
+                    },
+                    instantiation: {
+                        src: null,
+                        attributes: {}
+                    },
+                };
+            }
         }
         return Scope.fromCXXRTL(
             scopeName,
