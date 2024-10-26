@@ -7,9 +7,22 @@ import { TimeInterval, TimePoint } from '../model/time';
 import { Reference, Sample, UnboundReference } from '../model/sample';
 import { Variable } from '../model/variable';
 import { Scope } from '../model/scope';
+import { Location } from '../model/source';
 
 function lazy<T>(thunk: () => Thenable<T>): Thenable<T> {
     return { then: (onfulfilled, onrejected) => thunk().then(onfulfilled, onrejected) };
+}
+function matchLocation(location: Location, filename: string, position: vscode.Position) {
+    if (location.file !== filename) {
+        return false;
+    }
+    if (location.startLine !== position.line) {
+        return false;
+    }
+    if (location.startColumn !== undefined && location.startColumn !== position.character) {
+        return false;
+    }
+    return true;
 }
 
 export interface ISimulationStatus {
@@ -33,10 +46,6 @@ export class Session {
 
     dispose() {
         this.connection.dispose();
-    }
-
-    get connection2(): Connection {
-        return this.connection;
     }
 
     // ======================================== Inspecting the design
@@ -145,6 +154,27 @@ export class Session {
         }
     }
 
+    async getVariablesForLocation(filename: string, position: vscode.Position): Promise<Variable[]> {
+        const variables: Variable[] = [];
+        const extractVariablesForLocationFromScope = async (scope: string) => {
+            const items = await this.listItemsInScope(scope);
+            for (const [itemName, itemDesc] of Object.entries(items)) {
+                const itemLocation = Location.fromCXXRTL(itemDesc.src);
+                console.log(itemLocation, filename, position, itemLocation !== null && matchLocation(itemLocation, filename, position));
+                if (itemLocation !== null && matchLocation(itemLocation, filename, position)) {
+                    variables.push(Variable.fromCXXRTL(itemName, itemDesc));
+                }
+            }
+            const subScopes = await this.listScopesInScope(scope);
+            for (const subScopeName of Object.keys(subScopes)) {
+                await extractVariablesForLocationFromScope(subScopeName);
+            }
+            return null;
+        };
+        await extractVariablesForLocationFromScope('');
+        return variables;
+    }
+
     // ======================================== Querying the database
 
     private referenceEpochs: Map<string, number> = new Map();
@@ -184,8 +214,8 @@ export class Session {
     }
 
     async queryInterval(
-        interval: TimeInterval,
         reference: Reference,
+        interval: TimeInterval,
         options: { collapse?: boolean } = {}
     ): Promise<Sample[]> {
         this.checkReferenceEpoch(reference.name, reference.epoch);
@@ -211,6 +241,12 @@ export class Session {
                 itemValuesArray
             );
         });
+    }
+
+    async queryAtCursor(reference: Reference): Promise<Sample> {
+        const interval = new TimeInterval(this.timeCursor, this.timeCursor);
+        const [sample] = await this.queryInterval(reference, interval);
+        return sample;
     }
 
     // ======================================== Manipulating the simulation

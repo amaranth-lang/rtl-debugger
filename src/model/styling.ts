@@ -9,6 +9,10 @@ export enum DisplayStyle {
     VHDL = 'VHDL',
 }
 
+export function languageForDisplayStyle(style: DisplayStyle): string {
+    return style as string;
+}
+
 export function variableDescription(style: DisplayStyle, variable: Variable, { scalar = false } = {}): string {
     let result = '';
     if (variable instanceof ScalarVariable && variable.lsbAt === 0 && variable.width === 1) {

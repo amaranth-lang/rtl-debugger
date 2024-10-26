@@ -1,7 +1,6 @@
 import * as vscode from 'vscode';
 
 import { UnboundReference, Designation, Reference } from '../model/sample';
-import { TimeInterval } from '../model/time';
 import { Session } from './session';
 
 class Observable<T> {
@@ -87,9 +86,8 @@ export class Observer {
                 }
                 this.reference = this.session.bindReference(this.referenceName, unboundReference);
             }
-            const interval = new TimeInterval(this.session.timeCursor, this.session.timeCursor);
-            const reference = this.reference; // could get invalidated in the meantime
-            const [sample] = await this.session.queryInterval(interval, reference);
+            const reference = this.reference; // could get invalidated during `await` below
+            const sample = await this.session.queryAtCursor(reference);
             for (const [designation, handle] of reference.allHandles()) {
                 const observable = this.observables.get(designation.canonicalKey)!;
                 observable.update(sample.extract(handle));

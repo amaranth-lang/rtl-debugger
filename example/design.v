@@ -1,22 +1,26 @@
-module counter(...);
+module counter(
+  input clk,
+  output reg [31:0] cnt = 0
+);
 
-  input clk;
-  output reg [7:0] cnt = 0;
+  parameter integer LIMIT = 0;
+
   always @(posedge clk)
-    if (cnt < 13)
-      cnt <= cnt + 1;
-    else
+    if (cnt == LIMIT)
       cnt <= 0;
+    else
+      cnt <= cnt + 1;
 
 endmodule
 
 (* top *)
-module top(...);
+module top(
+  input clk,
+  output [7:0] data,
+  output [31:0] timer
+);
 
-  input clk;
-  output [7:0] data;
-
-  reg [7:0] message [0:13];
+  reg [7:0] message [14];
   initial begin
     message[0] = "h";
     message[1] = "e";
@@ -33,12 +37,21 @@ module top(...);
     message[12] = "\n";
   end
 
-  wire [7:0] index;
-  counter counter_inst(
+  wire [7:0] message_index;
+  counter #(
+    .LIMIT(13)
+  ) counter_message(
     .clk(clk),
-    .cnt(index)
+    .cnt(message_index)
   );
 
-  assign data = message[index];
+  assign data = message[message_index];
+
+  counter #(
+    .LIMIT(32'hffffffff)
+  ) counter_timer(
+    .clk(clk),
+    .cnt(timer),
+  );
 
 endmodule

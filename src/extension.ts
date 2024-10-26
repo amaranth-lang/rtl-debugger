@@ -1,8 +1,10 @@
 import * as vscode from 'vscode';
+
 import { CXXRTLDebugger } from './debugger';
 import * as sidebar from './ui/sidebar';
 import { globalWatchList } from './debug/watch';
 import { globalVariableOptions } from './debug/options';
+import { HoverProvider } from './ui/hover';
 import { inputTime } from './ui/input';
 
 export function activate(context: vscode.ExtensionContext) {
@@ -13,6 +15,11 @@ export function activate(context: vscode.ExtensionContext) {
         treeDataProvider: sidebarTreeDataProvider
     });
     context.subscriptions.push(sidebarTreeView);
+
+    const hoverProvider = new HoverProvider(rtlDebugger);
+    for (const language of HoverProvider.SUPPORTED_LANGUAGES) {
+        context.subscriptions.push(vscode.languages.registerHoverProvider(language, hoverProvider));
+    }
 
     vscode.commands.executeCommand('setContext', 'rtlDebugger.sessionStatus', rtlDebugger.sessionStatus);
     context.subscriptions.push(rtlDebugger.onDidChangeSessionStatus((state) =>
