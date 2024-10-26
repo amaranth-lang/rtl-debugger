@@ -83,10 +83,10 @@ export function variableValue(style: DisplayStyle, variable: Variable, value: bi
         }
         let stringValue;
         switch (radix) {
-            case 2:  stringValue = value.toString(2) .padStart(variable.width / 1, '0');
-            case 8:  stringValue = value.toString(8) .padStart(variable.width / 3, '0');
-            case 10: stringValue = value.toString(10);
-            case 16: stringValue = value.toString(16).padStart(variable.width / 4, '0');
+            case 2:  stringValue = value.toString(2) .padStart(variable.width / 1, '0'); break;
+            case 8:  stringValue = value.toString(8) .padStart(variable.width / 3, '0'); break;
+            case 10: stringValue = value.toString(10); break;
+            case 16: stringValue = value.toString(16).padStart(variable.width / 4, '0'); break;
         }
         switch (style) {
             case DisplayStyle.Python:
