@@ -12,8 +12,8 @@ export class StatusBarItem {
         rtlDebugger.onDidChangeSession((session) => {
             this.update(session);
             if (session !== null) {
-                session.onDidChangeSimulationStatus((_status) => this.update(session));
-                session.onDidChangeTimeCursor((_time) => this.update(session));
+                session.onDidChangeSimulationStatus((_simulationStatus) => this.update(session));
+                session.onDidChangeTimeCursor((_timeCursor) => this.update(session));
             }
         });
     }

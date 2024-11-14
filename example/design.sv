@@ -54,4 +54,10 @@ module top(
     .cnt(timer),
   );
 
+  always @(*)
+    $display("message_index = %d, timer = %d", message_index, timer);
+
+  always @(posedge clk)
+    assert (timer < 5);
+
 endmodule

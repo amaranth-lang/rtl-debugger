@@ -3,6 +3,7 @@ import * as vscode from 'vscode';
 export class Location {
     constructor(
         readonly file: string,
+        // All zero-based, like VS Code itself.
         readonly startLine: number,
         readonly startColumn?: number,
         readonly endLine?: number,
@@ -26,10 +27,23 @@ export class Location {
         );
     }
 
+    get fileUri(): vscode.Uri {
+        return vscode.Uri.file(this.file);
+    }
+
+    get range(): vscode.Range {
+        return new vscode.Range(
+            this.startLine,
+            this.startColumn ?? 0,
+            this.endLine ?? this.startLine,
+            this.endColumn ?? this.startColumn ?? 0
+        );
+    }
+
     private openCommandArguments(): [vscode.Uri, vscode.TextDocumentShowOptions] {
-        const position = new vscode.Position(this.startLine || 0, this.startColumn || 0);
+        const position = new vscode.Position(this.startLine, this.startColumn ?? 0);
         return [
-            vscode.Uri.parse(this.file),
+            this.fileUri,
             {
                 selection: new vscode.Selection(position, position),
                 preview: true,

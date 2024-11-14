@@ -9,7 +9,7 @@ design_sim: design_sim.cc design.cc
 	clang++ $(CXXFLAGS) -o $@ $(abspath $^)
 
 design.h: design.cc
-design.cc: design.v
+design.cc: design.sv
 	$(YOSYS) -q $(abspath $^) -p hierarchy -p 'write_cxxrtl -header $@'
 
 clean:

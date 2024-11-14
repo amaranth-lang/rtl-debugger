@@ -5,6 +5,7 @@ import * as sidebar from './ui/sidebar';
 import { globalWatchList } from './debug/watch';
 import { globalVariableOptions } from './debug/options';
 import { HoverProvider } from './ui/hover';
+import { DiagnosticProvider } from './ui/diagnostic';
 import { inputTime } from './ui/input';
 
 export function activate(context: vscode.ExtensionContext) {
@@ -20,6 +21,10 @@ export function activate(context: vscode.ExtensionContext) {
     for (const language of HoverProvider.SUPPORTED_LANGUAGES) {
         context.subscriptions.push(vscode.languages.registerHoverProvider(language, hoverProvider));
     }
+
+    const diagnosticCollection = vscode.languages.createDiagnosticCollection('rtlDebugger');
+    const diagnosticProvider = new DiagnosticProvider(rtlDebugger, diagnosticCollection);
+    context.subscriptions.push(diagnosticProvider);
 
     vscode.commands.executeCommand('setContext', 'rtlDebugger.sessionStatus', rtlDebugger.sessionStatus);
     context.subscriptions.push(rtlDebugger.onDidChangeSessionStatus((state) =>
