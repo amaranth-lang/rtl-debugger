@@ -26,7 +26,7 @@ export class HoverProvider implements vscode.HoverProvider {
             }
         }
         const reference = session.bindReference('hover', unboundReference);
-        const sample = await session.queryAtCursor(reference);
+        const sample = await session.queryAtCursor({ reference });
         for (const [designation, handle] of reference.allHandles()) {
             const variable = designation.variable;
             const descriptionText = variableDescription(displayStyle, variable);

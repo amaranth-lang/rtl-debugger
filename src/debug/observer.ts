@@ -87,7 +87,7 @@ export class Observer {
                 this.reference = this.session.bindReference(this.referenceName, unboundReference);
             }
             const reference = this.reference; // could get invalidated during `await` below
-            const sample = await this.session.queryAtCursor(reference);
+            const sample = await this.session.queryAtCursor({ reference });
             for (const [designation, handle] of reference.allHandles()) {
                 const observable = this.observables.get(designation.canonicalKey)!;
                 observable.update(sample.extract(handle));

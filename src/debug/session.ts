@@ -4,7 +4,7 @@ import * as proto from '../cxxrtl/proto';
 import { ILink } from '../cxxrtl/link';
 import { Connection } from '../cxxrtl/client';
 import { TimeInterval, TimePoint } from '../model/time';
-import { Reference, Sample, UnboundReference } from '../model/sample';
+import { Diagnostic, Reference, Sample, UnboundReference } from '../model/sample';
 import { Variable } from '../model/variable';
 import { Scope } from '../model/scope';
 import { Location } from '../model/source';
@@ -12,6 +12,7 @@ import { Location } from '../model/source';
 function lazy<T>(thunk: () => Thenable<T>): Thenable<T> {
     return { then: (onfulfilled, onrejected) => thunk().then(onfulfilled, onrejected) };
 }
+
 function matchLocation(location: Location, filename: string, position: vscode.Position) {
     if (location.file !== filename) {
         return false;
@@ -214,38 +215,55 @@ export class Session {
     }
 
     async queryInterval(
-        reference: Reference,
         interval: TimeInterval,
-        options: { collapse?: boolean } = {}
+        options: {
+            reference?: Reference,
+            diagnostics?: boolean
+            collapse?: boolean,
+        } = {}
     ): Promise<Sample[]> {
-        this.checkReferenceEpoch(reference.name, reference.epoch);
+        const reference = options.reference;
+        if (reference !== undefined) {
+            this.checkReferenceEpoch(reference.name, reference.epoch);
+        }
         const response = await this.connection.queryInterval({
             type: 'command',
             command: 'query_interval',
             interval: interval.toCXXRTL(),
+            items: reference?.name ?? null,
+            item_values_encoding: reference ? 'base64(u32)' : null,
+            diagnostics: options.diagnostics ?? false,
             collapse: options.collapse ?? true,
-            items: reference.name,
-            item_values_encoding: 'base64(u32)',
-            diagnostics: false
         });
         return response.samples.map((cxxrtlSample) => {
-            const itemValuesBuffer = Buffer.from(cxxrtlSample.item_values!, 'base64');
-            const itemValuesArray = new Uint32Array(
-                itemValuesBuffer.buffer,
-                itemValuesBuffer.byteOffset,
-                itemValuesBuffer.length / Uint32Array.BYTES_PER_ELEMENT
-            );
+            let itemValuesArray = null;
+            let diagnosticsArray = null;
+            if (cxxrtlSample.item_values !== undefined) {
+                const itemValuesBuffer = Buffer.from(cxxrtlSample.item_values, 'base64');
+                itemValuesArray = new Uint32Array(
+                    itemValuesBuffer.buffer,
+                    itemValuesBuffer.byteOffset,
+                    itemValuesBuffer.length / Uint32Array.BYTES_PER_ELEMENT
+                );
+            }
+            if (cxxrtlSample.diagnostics !== undefined) {
+                diagnosticsArray = Array.from(cxxrtlSample.diagnostics, Diagnostic.fromCXXRTL);
+            }
             return new Sample(
                 TimePoint.fromCXXRTL(cxxrtlSample.time),
-                reference.unbound,
-                itemValuesArray
+                reference?.unbound ?? null,
+                itemValuesArray,
+                diagnosticsArray,
             );
         });
     }
 
-    async queryAtCursor(reference: Reference): Promise<Sample> {
+    async queryAtCursor(options: {
+        reference?: Reference,
+        diagnostics?: boolean
+    }): Promise<Sample> {
         const interval = new TimeInterval(this.timeCursor, this.timeCursor);
-        const [sample] = await this.queryInterval(reference, interval);
+        const [sample] = await this.queryInterval(interval, options);
         return sample;
     }
 

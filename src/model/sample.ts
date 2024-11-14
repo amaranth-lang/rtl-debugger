@@ -1,4 +1,5 @@
 import * as proto from '../cxxrtl/proto';
+import { Location } from './source';
 import { TimePoint } from './time';
 import { MemoryVariable, ScalarVariable, Variable } from './variable';
 
@@ -176,16 +177,47 @@ export class Reference {
     }
 }
 
+export enum DiagnosticType {
+    Break = 'break',
+    Print = 'print',
+    Assert = 'assert',
+    Assume = 'assume',
+}
+
+export class Diagnostic {
+    constructor(
+        readonly type: DiagnosticType,
+        readonly text: string,
+        readonly location: Location | null,
+    ) {}
+
+    static fromCXXRTL(cxxrtlDiagnostic: proto.Diagnostic): Diagnostic {
+        return new Diagnostic(
+            <DiagnosticType>cxxrtlDiagnostic.type,
+            cxxrtlDiagnostic.text,
+            Location.fromCXXRTL(cxxrtlDiagnostic.src)
+        );
+    }
+}
+
 export class Sample {
     constructor(
         readonly time: TimePoint,
-        readonly reference: UnboundReference,
-        readonly variableData: Uint32Array,
-    ) {}
+        readonly reference: UnboundReference | null,
+        readonly variableData: Uint32Array | null,
+        readonly diagnostics: Diagnostic[] | null,
+    ) {
+        if ((this.reference === null) !== (this.variableData === null)) {
+            throw new Error('A sample must include both a reference and variable data, or neither');
+        }
+    }
 
     extract<T>(handle: Handle<T>): T {
         if (handle.reference !== this.reference) {
-            throw new ReferenceError('Handle is not bound to the same reference as the sample');
+            throw new Error('Handle is not bound to the same reference as the sample');
+        }
+        if (this.variableData === null) {
+            throw new Error('Sample does not include item values');
         }
         return handle.extractFromRaw(this.variableData);
     }
