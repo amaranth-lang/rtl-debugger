@@ -21,7 +21,7 @@ int main(int argc, char **argv) {
   agent.step();
 
   size_t steps = 0;
-  while (true) {
+  do {
     agent.advance(1_ns);
     top.p_clk.set(false);
     agent.step();
@@ -29,7 +29,10 @@ int main(int argc, char **argv) {
     agent.advance(1_ns);
     top.p_clk.set(true);
     agent.step();
-  }
+
+    if (steps == 3)
+      agent.breakpoint(CXXRTL_LOCATION);
+  } while (steps++ < 1000);
 
   return 0;
 }

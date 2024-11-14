@@ -6,7 +6,7 @@ CXXFLAGS += -g -O0
 CXXFLAGS += -DCXXRTL_SERVER_TRACE
 
 design_sim: design_sim.cc design.cc
-	clang++ $(CXXFLAGS) -o $@ $^
+	clang++ $(CXXFLAGS) -o $@ $(abspath $^)
 
 design.h: design.cc
 design.cc: design.v
