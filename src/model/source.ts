@@ -21,9 +21,9 @@ export class Location {
         return new Location(
             matches[1],
             parseInt(matches[2]) - 1,
-            matches.length >= 4 ? parseInt(matches[3]) - 1 : undefined,
-            matches.length >= 4 ? parseInt(matches[4]) - 1 : undefined,
-            matches.length >= 6 ? parseInt(matches[5]) - 1 : undefined,
+            matches[3] !== undefined ? parseInt(matches[3]) - 1 : undefined,
+            matches[4] !== undefined ? parseInt(matches[4]) - 1 : undefined,
+            matches[5] !== undefined ? parseInt(matches[5]) - 1 : undefined,
         );
     }
 
@@ -36,7 +36,7 @@ export class Location {
             this.startLine,
             this.startColumn ?? 0,
             this.endLine ?? this.startLine,
-            this.endColumn ?? this.startColumn ?? 0
+            this.endColumn ?? 4096
         );
     }
 

@@ -161,7 +161,6 @@ export class Session {
             const items = await this.listItemsInScope(scope);
             for (const [itemName, itemDesc] of Object.entries(items)) {
                 const itemLocation = Location.fromCXXRTL(itemDesc.src);
-                console.log(itemLocation, filename, position, itemLocation !== null && matchLocation(itemLocation, filename, position));
                 if (itemLocation !== null && matchLocation(itemLocation, filename, position)) {
                     variables.push(Variable.fromCXXRTL(itemName, itemDesc));
                 }
