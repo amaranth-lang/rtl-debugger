@@ -366,7 +366,6 @@ export class Session {
             if (this.simulationStatus.status === 'paused') {
                 const nextSampleTime = this.simulationStatus.nextSampleTime!;
                 await this.runSimulation({ untilTime: nextSampleTime });
-                await this.querySimulationStatus();
                 if (!nextSampleTime.greaterThan(this.simulationStatus.latestTime)) {
                     this.timeCursor = nextSampleTime;
                 }

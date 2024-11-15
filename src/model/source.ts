@@ -40,7 +40,7 @@ export class Location {
         );
     }
 
-    private openCommandArguments(): [vscode.Uri, vscode.TextDocumentShowOptions] {
+    openCommandArguments(): [vscode.Uri, vscode.TextDocumentShowOptions] {
         const position = new vscode.Position(this.startLine, this.startColumn ?? 0);
         return [
             this.fileUri,
@@ -60,6 +60,7 @@ export class Location {
         };
     }
 
+    // Really? *Three* different command representations depending on the API? VS Code please.
     asOpenCommandUri(): vscode.Uri {
         const args = this.openCommandArguments();
         return vscode.Uri.parse(`command:rtlDebugger.openDocument?${encodeURIComponent(JSON.stringify(args))}`);

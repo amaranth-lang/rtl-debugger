@@ -60,4 +60,7 @@ module top(
   always @(posedge clk)
     assert (timer < 5);
 
+  always @(posedge clk)
+    assert (timer < 7); // two asserts at once
+
 endmodule

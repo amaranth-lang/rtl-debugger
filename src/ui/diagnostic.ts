@@ -10,10 +10,18 @@ export class DiagnosticProvider {
         private diagnosticCollection: vscode.DiagnosticCollection,
     ) {
         rtlDebugger.onDidChangeSession((session) => {
-            this.update(session);
-            if (session !== null) {
-                session.onDidChangeSimulationStatus((_simulationStatus) => this.update(session));
-                session.onDidChangeTimeCursor((_timeCursor) => this.update(session));
+            if (session === null) {
+                this.clear();
+            } else {
+                session.onDidChangeSimulationStatus((simulationStatus) => {
+                    if (simulationStatus.status === 'running') {
+                        this.clear();
+                    }
+                });
+                session.onDidChangeTimeCursor((_timeCursor) => {
+                    this.request(session);
+                });
+                this.request(session);
             }
         });
     }
@@ -22,17 +30,20 @@ export class DiagnosticProvider {
         this.diagnosticCollection.dispose();
     }
 
-    private async update(session: Session | null) {
-        if (session === null || session?.simulationStatus.status === 'running') {
-            this.apply([]);
-        } else {
-            const sample = await session.queryAtCursor({ diagnostics: true });
-            this.apply(sample.diagnostics!);
-        }
+    private async clear() {
+        this.apply([]);
+    }
+
+    private async request(session: Session) {
+        const sample = await session.queryAtCursor({ diagnostics: true });
+        this.apply(sample.diagnostics!);
     }
 
     private apply(diagnostics: Diagnostic[]) {
         const diagnosticMap = new Map();
+        let mostImportantDiagnostic = null;
+        let mostImportantDiagnosticSeverity = vscode.DiagnosticSeverity.Hint;
+        let multipleImportantDiagnostics = false;
         for (const diagnostic of diagnostics) {
             if (diagnostic.location === null) {
                 continue;
@@ -85,6 +96,17 @@ export class DiagnosticProvider {
                     severity = vscode.DiagnosticSeverity.Error;
                     break;
             }
+            if (severity !== vscode.DiagnosticSeverity.Information && diagnostic.location !== null) {
+                // Prioritize assertions/assumptions over breakpoints. (It's unclear whether this
+                // specific prioritization is the best one, but one of them should probably take
+                // priority over the other.)
+                multipleImportantDiagnostics = (mostImportantDiagnostic !== null);
+                if (severity < mostImportantDiagnosticSeverity) {
+                    mostImportantDiagnostic = diagnostic;
+                    mostImportantDiagnosticSeverity = severity;
+                }
+            }
+
             if (message !== '') {
                 const mappedDiagnostic = new vscode.Diagnostic(range, message, severity);
                 mappedDiagnostic.code = <string>diagnostic.type;
@@ -95,5 +117,18 @@ export class DiagnosticProvider {
 
         this.diagnosticCollection.clear();
         this.diagnosticCollection.set(Array.from(diagnosticMap.entries()));
+
+        if (mostImportantDiagnostic !== null) {
+            this.focus(mostImportantDiagnostic, multipleImportantDiagnostics);
+        }
+    }
+
+    private async focus(diagnostic: Diagnostic, showDiagnosticsPane: boolean = false) {
+        if (showDiagnosticsPane) {
+            await vscode.commands.executeCommand('workbench.actions.view.problems');
+        }
+        // 2024-11-14: Upsettingly, this is the best (and, more or less, only) way to expand a diagnostic.
+        await vscode.window.showTextDocument(...diagnostic.location!.openCommandArguments());
+        await vscode.commands.executeCommand('editor.action.marker.next');
     }
 }
