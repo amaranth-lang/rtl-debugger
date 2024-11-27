@@ -371,6 +371,7 @@ export class Session {
                 }
             }
         } else {
+            let ordersOfMagnitude = 0;
             while (true) {
                 const followingTimePoint = this.timeCursor.offsetByFemtos(this._forwardTimeStep);
                 const response = await this.connection.queryInterval({
@@ -382,12 +383,15 @@ export class Session {
                     item_values_encoding: null,
                     diagnostics: false
                 });
-                if (response.samples.length === 1) {
-                    this._forwardTimeStep = this._forwardTimeStep * 2n;
-                    continue;
+                if (response.samples.length > 1) {
+                    this.timeCursor = TimePoint.fromCXXRTL(response.samples.at(1)!.time);
+                    break;
+                } else if (ordersOfMagnitude < 30 /* femto -> peta */) {
+                    ordersOfMagnitude += 1;
+                    this._forwardTimeStep = this._forwardTimeStep * 10n;
+                } else {
+                    throw new RangeError('Could not find a sample to step forward to');
                 }
-                this.timeCursor = TimePoint.fromCXXRTL(response.samples.at(1)!.time);
-                break;
             }
         }
         return this.timeCursor;
