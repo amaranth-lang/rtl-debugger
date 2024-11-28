@@ -4,7 +4,7 @@ import * as proto from '../cxxrtl/proto';
 import { ILink } from '../cxxrtl/link';
 import { Connection } from '../cxxrtl/client';
 import { TimeInterval, TimePoint } from '../model/time';
-import { Diagnostic, Reference, Sample, UnboundReference } from '../model/sample';
+import { Diagnostic, DiagnosticType, Reference, Sample, UnboundReference } from '../model/sample';
 import { Variable } from '../model/variable';
 import { Scope } from '../model/scope';
 import { Location } from '../model/source';
@@ -32,6 +32,11 @@ export interface ISimulationStatus {
     nextSampleTime?: TimePoint;
 }
 
+export enum SimulationPauseReason {
+    TimeReached,
+    DiagnosticsReached,
+}
+
 export class Session {
     private connection: Connection;
 
@@ -52,8 +57,10 @@ export class Session {
             for (const secondaryLink of this.secondaryLinks) {
                 secondaryLink.onRecv(event);
             }
-            if (event.event === 'simulation_paused' || event.event === 'simulation_finished') {
-                await this.querySimulationStatus();
+            if (event.event === 'simulation_paused') {
+                await this.handleSimulationPausedEvent(event.cause);
+            } else if (event.event === 'simulation_finished') {
+                await this.handleSimulationFinishedEvent();
             }
         };
         this.querySimulationStatus(); // populate nextSampleTime
@@ -313,8 +320,17 @@ export class Session {
 
     private simulationStatusTimeout: NodeJS.Timeout | null = null;
 
-    private _onDidChangeSimulationStatus: vscode.EventEmitter<ISimulationStatus> = new vscode.EventEmitter<ISimulationStatus>();
+    private _onDidChangeSimulationStatus: vscode.EventEmitter<ISimulationStatus> = new vscode.EventEmitter();
     readonly onDidChangeSimulationStatus: vscode.Event<ISimulationStatus> = this._onDidChangeSimulationStatus.event;
+
+    private _onDidRunSimulation: vscode.EventEmitter<void> = new vscode.EventEmitter();
+    readonly onDidRunSimulation: vscode.Event<void> = this._onDidRunSimulation.event;
+
+    private _onDidPauseSimulation: vscode.EventEmitter<SimulationPauseReason> = new vscode.EventEmitter();
+    readonly onDidPauseSimulation: vscode.Event<SimulationPauseReason> = this._onDidPauseSimulation.event;
+
+    private _onDidFinishSimulation: vscode.EventEmitter<void> = new vscode.EventEmitter();
+    readonly onDidFinishSimulation: vscode.Event<void> = this._onDidFinishSimulation.event;
 
     private _simulationStatus: ISimulationStatus = {
         status: 'paused',
@@ -354,15 +370,19 @@ export class Session {
         }
     }
 
-    async runSimulation(options: { untilTime?: TimePoint } = {}): Promise<void> {
+    async runSimulation(options: {
+        untilTime?: TimePoint,
+        untilDiagnostics?: DiagnosticType[]
+    } = {}): Promise<void> {
         await this.connection.runSimulation({
             type: 'command',
             command: 'run_simulation',
             until_time: options.untilTime?.toCXXRTL() ?? null,
-            until_diagnostics: [],
+            until_diagnostics: options.untilDiagnostics?.map((type) => <DiagnosticType>type) ?? [],
             sample_item_values: true
         });
         await this.querySimulationStatus();
+        this._onDidRunSimulation.fire();
     }
 
     async pauseSimulation(): Promise<void> {
@@ -370,7 +390,42 @@ export class Session {
             type: 'command',
             command: 'pause_simulation'
         });
+    }
+
+    private async handleSimulationPausedEvent(cause: proto.PauseCause): Promise<void> {
+        if (cause === 'until_time') {
+            await this.querySimulationStatus();
+            this._onDidPauseSimulation.fire(SimulationPauseReason.TimeReached);
+        } else if (cause === 'until_diagnostics') {
+            // The `until_diagnostics` cause is a little cursed. For `always @(posedge clk)`
+            // assertions, the pause time will be two steps ahead, and for `always @(*)` ones,
+            // it will usually be one step ahead. This is because of several fencepost issues with
+            // both the storage and the retrieval of diagnostics, which are baked into the CXXRTL
+            // execution and replay model. (Diagnostics recorded from C++ are fine.)
+            //
+            // To handle this, rather than relying on the event time, we scan the database for any
+            // diagnostics since the last time the simulation state was updated. (A diagnostic that
+            // caused the simulation to be paused must be somewhere between that and the latest
+            // sample in the database at the time of pausing.) This avoids the need to simulate
+            // the entire interval twice, as would happen if querying the interval between the "Run
+            // Simulation Until Diagnostics" command and the time of pausing.
+            const latestTimeBeforePause = this.simulationStatus.latestTime;
+            await this.querySimulationStatus();
+            const latestTimeAfterPause = this.simulationStatus.latestTime;
+            const diagnosticAt = await this.searchIntervalForDiagnostics(
+                new TimeInterval(latestTimeBeforePause, latestTimeAfterPause));
+            if (diagnosticAt === null) {
+                console.error('[CXXRTL] Paused on diagnostic but no such diagnostics found');
+                return;
+            }
+            this.timeCursor = diagnosticAt;
+            this._onDidPauseSimulation.fire(SimulationPauseReason.DiagnosticsReached);
+        }
+    }
+
+    private async handleSimulationFinishedEvent(): Promise<void> {
         await this.querySimulationStatus();
+        this._onDidFinishSimulation.fire();
     }
 
     get isSimulationRunning(): boolean {
@@ -455,5 +510,53 @@ export class Session {
             this.timeCursor = TimePoint.fromCXXRTL(response.samples.at(0)!.time);
         }
         return this.timeCursor;
+    }
+
+    async continueForward(): Promise<void> {
+        if (this.timeCursor.lessThan(this.simulationStatus.latestTime)) {
+            const diagnosticAt = await this.searchIntervalForDiagnostics(
+                new TimeInterval(this.timeCursor, this.simulationStatus.latestTime));
+            if (diagnosticAt !== null) {
+                this.timeCursor = diagnosticAt;
+                return;
+            }
+        }
+        // No diagnostics between time cursor and end of database; run the simulation.
+        if (this.simulationStatus.status === 'paused') {
+            // The pause handler will run `searchIntervalForDiagnostics`.
+            await this.runSimulation({
+                untilDiagnostics: [
+                    DiagnosticType.Assert,
+                    DiagnosticType.Assume,
+                    DiagnosticType.Break
+                ]
+            });
+        } else if (this.simulationStatus.status === 'finished') {
+            this.timeCursor = this.simulationStatus.latestTime;
+        }
+    }
+
+    private async searchIntervalForDiagnostics(interval: TimeInterval): Promise<TimePoint | null> {
+        const response = await this.connection.queryInterval({
+            type: 'command',
+            command: 'query_interval',
+            interval: interval.toCXXRTL(),
+            collapse: true,
+            items: null,
+            item_values_encoding: null,
+            diagnostics: true
+        });
+        for (const sample of response.samples) {
+            const sampleTime = TimePoint.fromCXXRTL(sample.time);
+            if (!sampleTime.greaterThan(interval.begin)) {
+                continue;
+            }
+            for (const diagnostic of sample.diagnostics!) {
+                if (['break', 'assert', 'assume'].includes(diagnostic.type)) {
+                    return sampleTime;
+                }
+            }
+        }
+        return null;
     }
 }

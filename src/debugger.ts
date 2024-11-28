@@ -83,6 +83,9 @@ export class CXXRTLDebugger {
                         this.session.onDidChangeSimulationStatus((status) => {
                             this.setSimulationStatus(status.status as CXXRTLSimulationStatus);
                         });
+                        this.session.onDidFinishSimulation(() => {
+                            vscode.window.showInformationMessage('Simulation has finished.');
+                        });
                         this.setSessionStatus(CXXRTLSessionStatus.Running);
                         this._onDidChangeSession.fire(this.session);
                         this.setSimulationStatus(

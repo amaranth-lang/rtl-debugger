@@ -61,6 +61,8 @@ export function activate(context: vscode.ExtensionContext) {
         rtlDebugger.session!.stepBackward()));
     context.subscriptions.push(vscode.commands.registerCommand('rtlDebugger.stepForward', () =>
         rtlDebugger.session!.stepForward()));
+    context.subscriptions.push(vscode.commands.registerCommand('rtlDebugger.continueForward', () =>
+        rtlDebugger.session!.continueForward()));
     context.subscriptions.push(vscode.commands.registerCommand('rtlDebugger.goToTime', async () => {
         const goToTime = await inputTime({ prompt: 'Enter the time to examine the state at.' });
         if (goToTime !== undefined) {

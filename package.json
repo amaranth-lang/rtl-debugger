@@ -102,8 +102,7 @@
       {
         "command": "rtlDebugger.runSimulation",
         "category": "RTL Debugger",
-        "title": "Run Simulation",
-        "icon": "$(debug-continue)"
+        "title": "Run Simulation"
       },
       {
         "command": "rtlDebugger.runSimulationUntil",
@@ -115,6 +114,12 @@
         "category": "RTL Debugger",
         "title": "Pause Simulation",
         "icon": "$(debug-pause)"
+      },
+      {
+        "command": "rtlDebugger.continueForward",
+        "category": "RTL Debugger",
+        "title": "Continue Forward",
+        "icon": "$(debug-continue)"
       },
       {
         "command": "rtlDebugger.stepForward",
@@ -218,6 +223,10 @@
           "when": "rtlDebugger.sessionStatus == running && rtlDebugger.simulationStatus == running"
         },
         {
+          "command": "rtlDebugger.continueForward",
+          "when": "rtlDebugger.sessionStatus == running"
+        },
+        {
           "command": "rtlDebugger.stepForward",
           "when": "rtlDebugger.sessionStatus == running"
         },
@@ -242,24 +251,24 @@
           "group": "navigation@2"
         },
         {
-          "command": "rtlDebugger.runSimulation",
-          "when": "view == rtlDebugger.sidebar && rtlDebugger.sessionStatus == running && rtlDebugger.simulationStatus == paused",
+          "command": "rtlDebugger.continueForward",
+          "when": "view == rtlDebugger.sidebar && rtlDebugger.sessionStatus == running && rtlDebugger.simulationStatus != running",
           "group": "navigation@3"
         },
         {
           "command": "rtlDebugger.pauseSimulation",
           "when": "view == rtlDebugger.sidebar && rtlDebugger.sessionStatus == running && rtlDebugger.simulationStatus == running",
-          "group": "navigation@3"
+          "group": "navigation@4"
         },
         {
           "command": "rtlDebugger.startSession",
           "when": "view == rtlDebugger.sidebar && rtlDebugger.sessionStatus == absent",
-          "group": "navigation@4"
+          "group": "navigation@10"
         },
         {
           "command": "rtlDebugger.stopSession",
           "when": "view == rtlDebugger.sidebar && rtlDebugger.sessionStatus == running",
-          "group": "navigation@5"
+          "group": "navigation@11"
         }
       ],
       "view/item/context": [
