@@ -35,9 +35,23 @@ export interface ISimulationStatus {
 export class Session {
     private connection: Connection;
 
+    private secondaryLinks: ILink[] = [];
+    private greetingPacketPromise: Promise<proto.ServerGreeting>;
+
     constructor(link: ILink) {
         this.connection = new Connection(link);
+        this.greetingPacketPromise = new Promise((resolve, _reject) => {
+            this.connection.onConnected = async (greetingPacket) => resolve(greetingPacket);
+        });
+        this.connection.onDisconnected = async () => {
+            for (const secondaryLink of this.secondaryLinks) {
+                secondaryLink.onDone();
+            }
+        };
         this.connection.onEvent = async (event) => {
+            for (const secondaryLink of this.secondaryLinks) {
+                secondaryLink.onRecv(event);
+            }
             if (event.event === 'simulation_paused' || event.event === 'simulation_finished') {
                 await this.querySimulationStatus();
             }
@@ -47,6 +61,35 @@ export class Session {
 
     dispose() {
         this.connection.dispose();
+    }
+
+    createSecondaryLink(): ILink {
+        const link: ILink = {
+            dispose: () => {
+                this.secondaryLinks.splice(this.secondaryLinks.indexOf(link));
+            },
+
+            send: async (clientPacket) => {
+                if (clientPacket.type === 'greeting') {
+                    const serverGreetingPacket = await this.greetingPacketPromise;
+                    if (clientPacket.version === serverGreetingPacket.version) {
+                        await link.onRecv(serverGreetingPacket);
+                    } else {
+                        throw new Error(
+                            `Secondary link requested greeting version ${clientPacket.version}, ` +
+                            `but server greeting version is ${serverGreetingPacket.version}`
+                        );
+                    }
+                } else {
+                    const serverPacket = await this.connection.perform(clientPacket);
+                    await link.onRecv(serverPacket);
+                }
+            },
+
+            onRecv: async (serverPacket) => {},
+            onDone: async () => {},
+        };
+        return link;
     }
 
     // ======================================== Inspecting the design

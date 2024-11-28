@@ -84,7 +84,7 @@ export class Connection {
                 this._events = packet.events;
                 this._itemValuesEncodings = packet.features.item_values_encoding;
                 this._state = ConnectionState.Connected;
-                await this.onConnected();
+                await this.onConnected(packet);
             } else {
                 this.rejectPromises(new Error(`unexpected CXXRTL protocol version ${packet.version}`));
             }
@@ -119,14 +119,14 @@ export class Connection {
         }
     }
 
-    private async perform(command: proto.AnyCommand): Promise<proto.AnyResponse> {
+    async perform(command: proto.AnyCommand): Promise<proto.AnyResponse> {
         await this.send(command);
         return new Promise((resolve, reject) => {
             this.promises.push({ resolve, reject });
         });
     }
 
-    async onConnected(): Promise<void> {}
+    async onConnected(greetingPacket: proto.ServerGreeting): Promise<void> {}
 
     async onDisconnected(): Promise<void> {}
 
