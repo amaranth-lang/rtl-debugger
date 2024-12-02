@@ -3,6 +3,7 @@
   "name": "rtl-debugger",
   "displayName": "RTL Debugger",
   "description": "Debugger for HDLs supported by the open-source toolchain: Amaranth, Verilog, VHDL, ...",
+  "license": "(ISC AND EUPL-1.2)",
   "version": "0.0.0",
   "repository": {
     "type": "git",
@@ -366,5 +367,7 @@
     "esbuild": "^0.24",
     "eslint": "^9.12",
     "typescript": "5.5.x",
+    "libsurfer": "file:vendor/surfer/libsurfer/pkg",
+    "@chialab/esbuild-plugin-meta-url": "^0.18"
   }
 }

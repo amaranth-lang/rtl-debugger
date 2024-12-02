@@ -6,7 +6,6 @@ import embedHtml from '../surfer/embed.html';
 
 export type ExtensionToWebviewMessage =
 | { type: 'restore', state: any }
-| { type: 'drawRect', bounds: [number, number, number, number] }
 ;
 
 export type WebviewToExtensionMessage =
@@ -44,7 +43,6 @@ export class WaveformProvider {
     private async processMessage(message: WebviewToExtensionMessage) {
         if (message.type === 'ready') {
             console.log('[RTL Debugger] [WaveformProvider] Ready');
-            this.sendMessage({ type: 'drawRect', bounds: [0, 0, 100, 100]});
         } else if (message.type === 'crash') {
             console.log('[RTL Debugger] [WaveformProvider] Crash:', message.error);
         } else {

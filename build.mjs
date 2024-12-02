@@ -1,12 +1,15 @@
 import * as esbuild from 'esbuild';
+import metaUrlPlugin from '@chialab/esbuild-plugin-meta-url';
 
 const mode = (process.argv[2] ?? 'build');
 
 const commonOptions = {
     logLevel: 'info',
+    plugins: [metaUrlPlugin()],
     bundle: true,
     loader: {
         '.html': 'text',
+        '.wasm': 'file',
     },
     target: 'es2021',
     sourcemap: 'linked',
