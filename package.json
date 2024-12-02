@@ -341,8 +341,8 @@
     "lint": "eslint --fix",
     "tsc": "tsc --project tsconfig.json",
     "tsc:watch": "npm run tsc -- --watch",
-    "esbuild": "esbuild ./src/extension.ts --bundle --sourcemap --outdir=out/ --format=cjs --platform=node --external:vscode",
-    "esbuild:watch": "npm run esbuild -- --watch",
+    "esbuild": "node build.mjs build",
+    "esbuild:watch": "node build.mjs watch",
     "vscode:prepublish": "npm run lint && npm run tsc && npm run esbuild",
     "package": "vsce package"
   },
