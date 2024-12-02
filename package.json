@@ -237,6 +237,30 @@
         {
           "command": "rtlDebugger.goToTime",
           "when": "rtlDebugger.sessionStatus == running"
+        },
+        {
+          "command": "rtlDebugger.setRadix.2",
+          "when": "rtlDebugger.sessionStatus == running"
+        },
+        {
+          "command": "rtlDebugger.setRadix.8",
+          "when": "rtlDebugger.sessionStatus == running"
+        },
+        {
+          "command": "rtlDebugger.setRadix.10",
+          "when": "rtlDebugger.sessionStatus == running"
+        },
+        {
+          "command": "rtlDebugger.setRadix.16",
+          "when": "rtlDebugger.sessionStatus == running"
+        },
+        {
+          "command": "rtlDebugger.watchVariable",
+          "when": "rtlDebugger.sessionStatus == running"
+        },
+        {
+          "command": "rtlDebugger.unWatchVariable",
+          "when": "rtlDebugger.sessionStatus == running"
         }
       ],
       "view/title": [
