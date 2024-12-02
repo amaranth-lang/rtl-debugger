@@ -1,0 +1,34 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <base href="__base_href__">
+    <style type="text/css">
+    body {
+        position: absolute;
+        width: 100%;
+        height: 100%;
+        padding: 0;
+        overflow: hidden;
+    }
+    #canvas {
+        position: absolute;
+        width: 100%;
+        height: 100%;
+    }
+    #overlay {
+        position: absolute;
+        inset: 0;
+        height: 0;
+        margin: auto 0;
+        text-align: center;
+    }
+    </style>
+    <script type="module" src="surferEmbed.js"></script>
+</head>
+<body>
+    <canvas id="canvas"></canvas>
+    <div id="overlay">Could not start Surfer waveform viewer.</div>
+</body>
+</html>

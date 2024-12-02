@@ -169,6 +169,11 @@
         "category": "RTL Debugger",
         "title": "Stop Watching",
         "icon": "$(remove)"
+      },
+      {
+        "command": "rtlDebugger.browseWaveforms",
+        "category": "RTL Debugger",
+        "title": "Browse Waveforms"
       }
     ],
     "viewsContainers": {
@@ -261,6 +266,10 @@
         {
           "command": "rtlDebugger.unWatchVariable",
           "when": "rtlDebugger.sessionStatus == running"
+        },
+        {
+          "command": "rtlDebugger.browseWaveforms",
+          "when": "rtlDebugger.sessionStatus == running"
         }
       ],
       "view/title": [
@@ -349,14 +358,13 @@
   "devDependencies": {
     "@types/node": "20.x",
     "@types/vscode": "^1.94",
+    "@types/vscode-webview": "^1.57",
+    "@stylistic/eslint-plugin": "^2.9.0",
     "@typescript-eslint/eslint-plugin": "^8",
     "@typescript-eslint/parser": "^8",
     "@vscode/vsce": "^3.x",
     "esbuild": "^0.24",
     "eslint": "^9.12",
-    "typescript": "5.5.x"
-  },
-  "dependencies": {
-    "@stylistic/eslint-plugin": "^2.9.0"
+    "typescript": "5.5.x",
   }
 }

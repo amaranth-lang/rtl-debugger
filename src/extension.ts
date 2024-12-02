@@ -7,6 +7,7 @@ import { globalVariableOptions } from './debug/options';
 import { HoverProvider } from './ui/hover';
 import { DiagnosticProvider } from './ui/diagnostic';
 import { inputTime } from './ui/input';
+import { WaveformProvider } from './ui/waveform';
 
 export function activate(context: vscode.ExtensionContext) {
     const rtlDebugger = new CXXRTLDebugger();
@@ -87,6 +88,19 @@ export function activate(context: vscode.ExtensionContext) {
         globalWatchList.append(treeItem.getWatchItem())));
     context.subscriptions.push(vscode.commands.registerCommand('rtlDebugger.unWatchVariable', (treeItem) =>
         globalWatchList.remove(treeItem.metadata.index)));
+
+    context.subscriptions.push(vscode.commands.registerCommand('rtlDebugger.browseWaveforms', () => {
+        const webviewPanel = vscode.window.createWebviewPanel(
+            'rtlDebugger.waveforms',
+            'Waveforms', {
+                viewColumn: vscode.ViewColumn.Beside,
+            }, {
+                enableScripts: true,
+                retainContextWhenHidden: true,
+            });
+        const bundleRoot = vscode.Uri.joinPath(context.extensionUri, 'out/');
+        context.subscriptions.push(new WaveformProvider(rtlDebugger, webviewPanel, bundleRoot));
+    }));
 
     // For an unknown reason, the `vscode.open` command (which does the exact same thing) ignores the options.
     context.subscriptions.push(vscode.commands.registerCommand('rtlDebugger.openDocument',
