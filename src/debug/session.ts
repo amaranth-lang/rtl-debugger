@@ -1,7 +1,7 @@
 import * as vscode from 'vscode';
 
 import * as proto from '../cxxrtl/proto';
-import { ILink } from '../cxxrtl/link';
+import * as link from '../cxxrtl/link';
 import { Connection } from '../cxxrtl/client';
 import { TimeInterval, TimePoint } from '../model/time';
 import { Diagnostic, DiagnosticType, Reference, Sample, UnboundReference } from '../model/sample';
@@ -40,10 +40,10 @@ export enum SimulationPauseReason {
 export class Session {
     private connection: Connection;
 
-    private secondaryLinks: ILink[] = [];
+    private secondaryLinks: link.ILink[] = [];
     private greetingPacketPromise: Promise<proto.ServerGreeting>;
 
-    constructor(link: ILink) {
+    constructor(link: link.ILink) {
         this.connection = new Connection(link);
         this.greetingPacketPromise = new Promise((resolve, _reject) => {
             this.connection.onConnected = async (greetingPacket) => resolve(greetingPacket);
@@ -53,10 +53,11 @@ export class Session {
                 secondaryLink.onDone();
             }
         };
-        this.connection.onEvent = async (event) => {
+        this.connection.onEvent = async (linkEvent) => {
             for (const secondaryLink of this.secondaryLinks) {
-                secondaryLink.onRecv(event);
+                secondaryLink.onRecv(linkEvent);
             }
+            const event = linkEvent.asObject();
             if (event.event === 'simulation_paused') {
                 await this.handleSimulationPausedEvent(event.cause);
             } else if (event.event === 'simulation_finished') {
@@ -70,33 +71,35 @@ export class Session {
         this.connection.dispose();
     }
 
-    createSecondaryLink(): ILink {
-        const link: ILink = {
+    createSecondaryLink(): link.ILink {
+        const secondaryLink: link.ILink = {
             dispose: () => {
-                this.secondaryLinks.splice(this.secondaryLinks.indexOf(link));
+                this.secondaryLinks.splice(this.secondaryLinks.indexOf(secondaryLink));
             },
 
-            send: async (clientPacket) => {
-                if (clientPacket.type === 'greeting') {
+            send: async (linkCommandPacket) => {
+                const packet = linkCommandPacket.asObject();
+                if (packet.type === 'greeting') {
                     const serverGreetingPacket = await this.greetingPacketPromise;
-                    if (clientPacket.version === serverGreetingPacket.version) {
-                        await link.onRecv(serverGreetingPacket);
+                    if (packet.version === serverGreetingPacket.version) {
+                        await secondaryLink.onRecv(link.Packet.fromObject(serverGreetingPacket));
                     } else {
                         throw new Error(
-                            `Secondary link requested greeting version ${clientPacket.version}, ` +
+                            `Secondary link requested greeting version ${packet.version}, ` +
                             `but server greeting version is ${serverGreetingPacket.version}`
                         );
                     }
                 } else {
-                    const serverPacket = await this.connection.perform(clientPacket);
-                    await link.onRecv(serverPacket);
+                    const linkResponsePacket = await this.connection.exchange(
+                        linkCommandPacket.cast<proto.AnyCommand>());
+                    await secondaryLink.onRecv(linkResponsePacket);
                 }
             },
 
             onRecv: async (serverPacket) => {},
             onDone: async () => {},
         };
-        return link;
+        return secondaryLink;
     }
 
     // ======================================== Inspecting the design

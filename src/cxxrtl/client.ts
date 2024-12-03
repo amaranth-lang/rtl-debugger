@@ -16,6 +16,8 @@ export enum ConnectionState {
 // Note that we trust that server returns well-formed JSON. It would take far too much time to
 // verify its adherence to the schema here, for little gain.
 export class Connection {
+    private readonly link: link.ILink;
+
     private _state = ConnectionState.Initializing;
 
     private _commands: string[] = [];
@@ -23,7 +25,7 @@ export class Connection {
     private _itemValuesEncodings: string[] = [];
 
     private promises: {
-        resolve: (response: proto.AnyResponse) => void;
+        resolve: (response: link.Packet<proto.AnyResponse>) => void;
         reject: (error: Error) => void;
     }[] = [];
     private timestamps: Date[] = [];
@@ -31,20 +33,22 @@ export class Connection {
     private sendIndex: number = 0;
     private recvIndex: number = 0;
 
-    constructor(private readonly link: link.ILink) {
+    constructor(link_: link.ILink) {
+        this.link = link_;
         this.link.onRecv = this.onLinkRecv.bind(this);
         this.link.onDone = this.onLinkDone.bind(this);
-        this.send({
+        this.send(link.Packet.fromObject({
             type: 'greeting',
             version: 0,
-        });
+        }));
     }
 
     dispose(): void {
         this.link.dispose();
     }
 
-    private traceSend(packet: proto.ClientPacket) {
+    private traceSend(linkPacket: link.Packet<proto.ClientPacket>) {
+        const packet = linkPacket.asObject();
         if (packet.type === 'greeting') {
             console.debug('[CXXRTL] C>S', packet);
         } else if (packet.type === 'command') {
@@ -53,7 +57,8 @@ export class Connection {
         }
     }
 
-    private traceRecv(packet: proto.ServerPacket) {
+    private traceRecv(linkPacket: link.Packet<proto.ServerPacket>) {
+        const packet = linkPacket.asObject();
         if (packet.type === 'greeting') {
             console.debug('[CXXRTL] S>C', packet);
         } else if (packet.type === 'response') {
@@ -67,17 +72,18 @@ export class Connection {
         }
     }
 
-    private async send(packet: proto.ClientPacket): Promise<void> {
-        this.traceSend(packet);
+    private async send(linkPacket: link.Packet<proto.ClientPacket>): Promise<void> {
+        this.traceSend(linkPacket);
         if (this._state === ConnectionState.Disconnected) {
             throw new Error('unable to send packet after link is shutdown');
         } else {
-            this.link.send(packet);
+            this.link.send(linkPacket);
         }
     }
 
-    private async onLinkRecv(packet: proto.ServerPacket): Promise<void> {
-        this.traceRecv(packet);
+    private async onLinkRecv(linkPacket: link.Packet<proto.ServerPacket>): Promise<void> {
+        this.traceRecv(linkPacket);
+        const packet = linkPacket.asObject();
         if (this._state === ConnectionState.Initializing && packet.type === 'greeting') {
             if (packet.version === 0) {
                 this._commands = packet.commands;
@@ -93,7 +99,7 @@ export class Connection {
             const nextPromise = this.promises.shift();
             if (nextPromise !== undefined) {
                 if (packet.type === 'response') {
-                    nextPromise.resolve(packet);
+                    nextPromise.resolve(link.Packet.fromObject(packet));
                 } else {
                     nextPromise.reject(new CommandError(packet));
                 }
@@ -101,7 +107,7 @@ export class Connection {
                 this.rejectPromises(new Error(`unexpected '${packet.type}' reply with no commands queued`));
             }
         } else if (this._state === ConnectionState.Connected && packet.type === 'event') {
-            await this.onEvent(packet);
+            await this.onEvent(link.Packet.fromObject(packet));
         } else {
             this.rejectPromises(new Error(`unexpected ${packet.type} packet received for ${this._state} connection`));
         }
@@ -119,7 +125,7 @@ export class Connection {
         }
     }
 
-    async perform(command: proto.AnyCommand): Promise<proto.AnyResponse> {
+    async exchange(command: link.Packet<proto.AnyCommand>): Promise<link.Packet<proto.AnyResponse>> {
         await this.send(command);
         return new Promise((resolve, reject) => {
             this.promises.push({ resolve, reject });
@@ -130,7 +136,7 @@ export class Connection {
 
     async onDisconnected(): Promise<void> {}
 
-    async onEvent(_event: proto.AnyEvent): Promise<void> {}
+    async onEvent(_event: link.Packet<proto.AnyEvent>): Promise<void> {}
 
     get state(): ConnectionState {
         return this._state;
@@ -148,31 +154,36 @@ export class Connection {
         return this._itemValuesEncodings.slice();
     }
 
+    private async command<T extends proto.AnyResponse>(command: proto.AnyCommand): Promise<T> {
+        const response = await this.exchange(link.Packet.fromObject(command));
+        return response.cast<T>().asObject();
+    }
+
     async listScopes(command: proto.CommandListScopes): Promise<proto.ResponseListScopes> {
-        return await this.perform(command) as proto.ResponseListScopes;
+        return this.command<proto.ResponseListScopes>(command);
     }
 
     async listItems(command: proto.CommandListItems): Promise<proto.ResponseListItems> {
-        return await this.perform(command) as proto.ResponseListItems;
+        return this.command<proto.ResponseListItems>(command);
     }
 
     async referenceItems(command: proto.CommandReferenceItems): Promise<proto.ResponseReferenceItems> {
-        return await this.perform(command) as proto.ResponseReferenceItems;
+        return this.command<proto.ResponseReferenceItems>(command);
     }
 
     async queryInterval(command: proto.CommandQueryInterval): Promise<proto.ResponseQueryInterval> {
-        return await this.perform(command) as proto.ResponseQueryInterval;
+        return this.command<proto.ResponseQueryInterval>(command);
     }
 
     async getSimulationStatus(command: proto.CommandGetSimulationStatus): Promise<proto.ResponseGetSimulationStatus> {
-        return await this.perform(command) as proto.ResponseGetSimulationStatus;
+        return this.command<proto.ResponseGetSimulationStatus>(command);
     }
 
     async runSimulation(command: proto.CommandRunSimulation): Promise<proto.ResponseRunSimulation> {
-        return await this.perform(command) as proto.ResponseRunSimulation;
+        return this.command<proto.ResponseRunSimulation>(command);
     }
 
     async pauseSimulation(command: proto.CommandPauseSimulation): Promise<proto.ResponsePauseSimulation> {
-        return await this.perform(command) as proto.ResponsePauseSimulation;
+        return this.command<proto.ResponsePauseSimulation>(command);
     }
 }
